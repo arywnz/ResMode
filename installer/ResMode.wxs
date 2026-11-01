@@ -22,7 +22,7 @@
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="ProgramsFolder" Name="Programs">
         <Directory Id="INSTALLFOLDER" Name="ResMode">
-          <Component Id="ApplicationFiles" Guid="*" Bitness="always64">
+          <Component Id="ApplicationFiles" Guid="F0C27B47-94A7-47E7-AD69-8DF7466847BD" Bitness="always64">
             <File Id="ResModeExe" Source="$(var.BinaryDir)\ResMode.exe" />
             <File Source="$(var.BinaryDir)\ResMode.ico" />
             <File Source="$(var.SourceDir)\assets\ResMode-logo.png" />
