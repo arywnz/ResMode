@@ -12,6 +12,7 @@ Installed copies find new releases through the GitHub releases list (`src/Update
 
 - The tag must look like `v0.2.3` or `v0.2.3-alpha.2`, and be higher than `AppInfo.Release` in `src/Native.cs`. Prereleases count; drafts do not.
 - The release must carry the MSI named exactly `ResMode-<version>-win-x64.msi` (the name Build-Msi.ps1 writes, with the tag's version). GitHub adds the SHA-256 digest to the asset itself; without it the app only opens the release page.
+- Pushing the tag publishes the release by itself: the `release` job in `build.yml` attaches the MSI and ZIP and uses `docs/RELEASE_NOTES_<version>.md` as the text, so that file must exist before tagging.
 - Before tagging, bump the version in step: `AppInfo.Release` (`src/Native.cs`), `src/AssemblyInfo.cs`, the `Version` in `installer/ResMode.wxs` (numeric part only), the file names and version check in `Build.ps1`, `Build-Msi.ps1`, `Package.ps1` and the workflows. The MSI replaces the previous one in place (`MajorUpgrade`) and keeps `%LOCALAPPDATA%\ResMode`.
 - Copies that did not come from the MSI (ZIP, build folder) are not replaced; they are sent to the release page.
 
