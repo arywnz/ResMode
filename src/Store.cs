@@ -40,6 +40,7 @@ public static class Store {
 
     // What gets written: "all", "games" (game sessions only) or "off". Errors are always kept, to help when something fails.
     public static string LogLevel = "all";
+    static readonly HashSet<string> migratedLogs=new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
     static readonly string[] Tags = { "jogo", "biblioteca", "sistema", "erro" };
     public static string Tag(LogKind kind) { return Tags[(int)kind]; }
@@ -47,6 +48,11 @@ public static class Store {
     public static void Log(string message, LogKind kind = LogKind.System) {
         if (kind != LogKind.Error && (LogLevel == "off" || (LogLevel == "games" && kind != LogKind.Game))) return;
         try {
+            LocalData.WithFileLock(LogFile,delegate{
+            if(!migratedLogs.Contains(Root)){
+                foreach(string file in Directory.GetFiles(Root,AppInfo.LogName+"*"))LocalData.MigrateLog(file);
+                migratedLogs.Add(Root);
+            }
             if (File.Exists(LogFile) && new FileInfo(LogFile).Length > MaxLogBytes) {
                 File.Move(LogFile, LogFile + "." + DateTime.Now.ToString("yyyyMMddHHmmss"));
                 var old = Directory.GetFiles(Root, AppInfo.LogName + ".*").OrderByDescending(f => f).Skip(KeptOldLogs);
@@ -54,23 +60,32 @@ public static class Store {
             }
             // One entry per line: names from manifests or the registry cannot forge extra log lines.
             string line = (message ?? "").Replace("\r", " ").Replace("\n", " ");
-            File.AppendAllText(LogFile, DateTime.Now.ToString("s") + " [" + Tag(kind) + "] " + line + Environment.NewLine, Encoding.UTF8);
+            File.AppendAllText(LogFile,LocalData.ProtectLog(DateTime.Now.ToString("s")+" ["+Tag(kind)+"] "+line)+Environment.NewLine,Encoding.UTF8);
+            });
         } catch { }
+    }
+
+    public static IEnumerable<string> ReadLogLines(string file){
+        if(new FileInfo(file).Length>2*1024*1024)throw new InvalidDataException("Histórico local grande demais.");
+        foreach(string line in File.ReadLines(file,Encoding.UTF8)){
+            string value;
+            try{value=LocalData.ReadLog(line);}catch{value=DateTime.Now.ToString("s")+" [erro] Não foi possível ler um registro protegido.";}
+            yield return value;
+        }
     }
 
     // DTDs and external entities are refused, and files are size-capped, so a tampered file cannot expand or fetch anything.
     public static T Read<T>(string file) {
-        if (new FileInfo(file).Length > 8 * 1024 * 1024) throw new InvalidDataException("Arquivo grande demais: " + Path.GetFileName(file));
         var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, XmlResolver = null, MaxCharactersFromEntities = 0 };
-        using (var s = File.OpenRead(file)) using (var reader = XmlReader.Create(s, settings))
+        using (var s = new MemoryStream(LocalData.ReadXmlBytes(file))) using (var reader = XmlReader.Create(s, settings))
             return (T)new XmlSerializer(typeof(T)).Deserialize(reader);
     }
 
     public static void Write<T>(string file, T value) {
-        string temp = file + ".tmp";
-        using (var s = File.Create(temp)) new XmlSerializer(typeof(T)).Serialize(s, value);
-        if (File.Exists(file)) File.Replace(temp, file, null);
-        else File.Move(temp, file);
+        using(var memory=new MemoryStream()){
+            new XmlSerializer(typeof(T)).Serialize(memory,value);
+            LocalData.WriteXmlBytes(file,memory.ToArray());
+        }
     }
 
     // Returns the display to the mode saved before the game resolution was applied.

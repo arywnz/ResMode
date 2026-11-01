@@ -10,11 +10,15 @@ $fixture = Join-Path $BinaryDirectory 'FeatureChecks.exe'
     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Core.dll `
     (Join-Path $PSScriptRoot 'tests\FeatureChecks.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Regression fixture compilation failed.' }
+& $compiler /nologo /target:exe /platform:x64 /optimize+ /codepage:65001 "/out:$(Join-Path $BinaryDirectory 'SecurityChecks.exe')" "/reference:$binary" `
+    /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Security.dll `
+    (Join-Path $PSScriptRoot 'tests\SecurityChecks.cs')
+if ($LASTEXITCODE -ne 0) { throw 'Security fixture compilation failed.' }
 if ($CompileOnly) { Write-Output 'Fixture compiled; execution deliberately skipped.'; return }
-foreach ($test in '/selftest','/preferencestest','features') {
+foreach ($test in '/selftest','/preferencestest','features','security') {
     $report = Join-Path $reports ($test.TrimStart('/') + '-' + [guid]::NewGuid().ToString('N') + '.txt')
-    $target = if ($test -eq 'features') { $fixture } else { $binary }
-    $arguments = if ($test -eq 'features') { '"' + $report + '"' } else { $test + ' "' + $report + '"' }
+    $target = if ($test -eq 'features') { $fixture } elseif($test -eq 'security'){Join-Path $BinaryDirectory 'SecurityChecks.exe'} else { $binary }
+    $arguments = if ($test -in @('features','security')) { '"' + $report + '"' } else { $test + ' "' + $report + '"' }
     $process = Start-Process -FilePath $target -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if (-not $process.WaitForExit(60000)) { $process.Kill(); throw "Test timeout: $test" }
     $process.Refresh()

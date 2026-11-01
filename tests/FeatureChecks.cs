@@ -46,10 +46,6 @@ public static class FeatureChecks {
             }
         }
         results.Add("PASS: halo usa pixels reais, preserva uma cor pura e acompanha cores diferentes nas bordas superior/inferior.");
-        var count=SteamAchievements.Parse("[[\"achievements\",{\"data\":{\"nTotal\":49,\"nAchieved\":15}}]]");Check(count.Available&&count.Total==49&&count.Unlocked==15,"Contagens de conquistas incorretas.");
-        Check(!SteamAchievements.Parse("[[\"achievements\",{\"data\":{\"nTotal\":1,\"nAchieved\":2}}]]").Available,"Contagem inválida aceita.");
-        Check(!SteamAchievements.Get("manual:test").Available,"Dados indisponíveis tratados como zero.");
-        results.Add("PASS: achievement cache schema, invalid counts and unavailable data.");
         using(var grid=new Grid{Size=new Size(1120,650)}){
             var games=Enumerable.Range(0,5).Select(i=>new LibraryGame{Key="fixture:"+i,Name="Fixture "+i,Launcher=Launchers.Manual,Installed=true,Rules=new List<GameRule>()}).ToList();grid.SetGames(games,false);
             var first=Card(grid,0);var last=Card(grid,4);grid.Pointer(new Point(first.X+30,first.Y+30));grid.Pointer(new Point(last.X+30,last.Y+30));

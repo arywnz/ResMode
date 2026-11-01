@@ -1,6 +1,6 @@
 # SignPath Foundation application preparation
 
-This is a prepared application, not a claim of acceptance. Apply at https://signpath.org/apply after the public release and checklist below are verified. Terms: https://signpath.org/terms.
+Historical application material for the 0.1.0 release. The maintainer reported that the project was not accepted due to the lack of an established public user base. Current releases are unsigned and do not depend on SignPath. The account setup below is not a requirement for using or distributing ResMode. Terms: https://signpath.org/terms.
 
 ## Suggested application answers
 

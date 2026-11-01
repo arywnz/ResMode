@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="ResMode" Manufacturer="ResMode contributors" Version="0.2.0" Language="1046" Codepage="1252"
+           UpgradeCode="BFAD72D0-1633-46C5-A330-7308E1FC9B6C" Scope="perUser" InstallerVersion="500">
+    <MajorUpgrade DowngradeErrorMessage="Uma versão mais recente do ResMode já está instalada." Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" />
+    <PropertyRef Id="WIX_IS_NETFRAMEWORK_48_OR_LATER_INSTALLED" />
+    <Launch Condition="Installed OR (VersionNT64 AND WIX_IS_NETFRAMEWORK_48_OR_LATER_INSTALLED)" Message="O ResMode precisa do Windows 64 bits com .NET Framework 4.8 ou mais recente." />
+    <Icon Id="ResModeIcon" SourceFile="$(var.BinaryDir)\ResMode.ico" />
+    <Property Id="ARPPRODUCTICON" Value="ResModeIcon" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/arywnz/ResMode" />
+    <Property Id="ARPNOREPAIR" Value="1" />
+    <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.SourceDir)\installer\License.rtf" />
+    <ui:WixUI Id="WixUI_Minimal" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+    <Property Id="PREVIOUSSTARTUP">
+      <DirectorySearch Id="FindPreviousStartup" Path="[StartupFolder]" Depth="0">
+        <FileSearch Id="FindPreviousStartupLink" Name="ResMode.lnk" />
+      </DirectorySearch>
+    </Property>
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="ProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="ResMode">
+          <Component Id="ApplicationFiles" Guid="*" Bitness="always64">
+            <File Id="ResModeExe" Source="$(var.BinaryDir)\ResMode.exe" />
+            <File Source="$(var.BinaryDir)\ResMode.ico" />
+            <File Source="$(var.SourceDir)\assets\ResMode-logo.png" />
+            <File Source="$(var.SourceDir)\LICENSE" />
+            <File Source="$(var.SourceDir)\README.md" />
+            <File Source="$(var.SourceDir)\PRIVACY.md" />
+            <File Source="$(var.SourceDir)\THIRD_PARTY_NOTICES.md" />
+            <File Source="$(var.SourceDir)\assets\fonts\OFL.txt" Name="Geist-OFL.txt" />
+            <RegistryValue Root="HKCU" Key="Software\ResMode\Installer" Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+            <RemoveFolder Id="RemoveInstallFolder" On="uninstall" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="DesktopFolder">
+      <Component Id="DesktopShortcut" Guid="*" Bitness="always64">
+        <Shortcut Id="DesktopLink" Name="ResMode" Target="[INSTALLFOLDER]ResMode.exe" WorkingDirectory="INSTALLFOLDER" Icon="ResModeIcon" />
+        <RegistryValue Root="HKCU" Key="Software\ResMode\Installer" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ResModeMenu" Name="ResMode">
+        <Component Id="MenuShortcut" Guid="*" Bitness="always64">
+          <Shortcut Id="MenuLink" Name="ResMode" Target="[INSTALLFOLDER]ResMode.exe" WorkingDirectory="INSTALLFOLDER" Icon="ResModeIcon" />
+          <RegistryValue Root="HKCU" Key="Software\ResMode\Installer" Name="MenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+          <RemoveFolder Id="RemoveMenuFolder" On="uninstall" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <StandardDirectory Id="StartupFolder">
+      <Component Id="ExistingStartupShortcut" Guid="*" Bitness="always64" Condition="PREVIOUSSTARTUP">
+        <Shortcut Id="StartupLink" Name="ResMode" Target="[INSTALLFOLDER]ResMode.exe" Arguments="/background" WorkingDirectory="INSTALLFOLDER" Icon="ResModeIcon" />
+        <RegistryValue Root="HKCU" Key="Software\ResMode\Installer" Name="StartupShortcut" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </StandardDirectory>
+    <Feature Id="ResModeApp" Title="ResMode" Level="1">
+      <ComponentRef Id="ApplicationFiles" />
+      <ComponentRef Id="DesktopShortcut" />
+      <ComponentRef Id="MenuShortcut" />
+      <ComponentRef Id="ExistingStartupShortcut" />
+    </Feature>
+  </Package>
+</Wix>
