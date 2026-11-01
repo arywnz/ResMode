@@ -69,7 +69,7 @@ public class SettingsOverlay : Modal {
         updateButton = new FlatButton { Width = Theme.S(132), Kind = ButtonKind.Secondary };
         updateButton.Click += delegate { Act(() => { if (owner.Update != null) owner.InstallUpdate(); else owner.CheckForUpdates(true); }); };
         autoUpdate = new ToggleSwitch();
-        new ToolTip().SetToolTip(autoUpdate, "Procurar sozinho ao abrir e a cada 12 horas. Não envia nada seu.");
+        new ToolTip().SetToolTip(autoUpdate, "Procurar sozinho ao abrir e a cada 15 minutos. Não envia nada seu.");
         autoUpdate.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetCheckUpdates(autoUpdate.Checked)); };
 
         var blocks = new List<Control> {

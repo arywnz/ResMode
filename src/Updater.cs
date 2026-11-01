@@ -72,9 +72,24 @@ public static class Updater {
     }
 
     // Blocking: run it on a worker thread. Null means this PC already has the newest release.
+    // The list is asked for with its last ETag: when nothing new was published GitHub answers 304 with no body
+    // (and no cost against the rate limit), which is what makes checking every few minutes cheap.
+    static string lastTag, lastJson;
+
     public static UpdateOffer Check() {
         string json;
-        using (var web = NewClient()) json = web.DownloadString(Api);
+        using (var web = NewClient()) {
+            if (lastTag != null && lastJson != null) web.Headers[HttpRequestHeader.IfNoneMatch] = lastTag;
+            try {
+                json = web.DownloadString(Api);
+                lastTag = web.ResponseHeaders[HttpResponseHeader.ETag];
+                lastJson = json;
+            } catch (WebException e) {
+                var response = e.Response as HttpWebResponse;
+                if (response == null || response.StatusCode != HttpStatusCode.NotModified || lastJson == null) throw;
+                json = lastJson;
+            }
+        }
         return Pick(json);
     }
 
@@ -172,7 +187,7 @@ public static class Updater {
             "Wait-Process -Id " + pid + " -Timeout 30;" +
             "Get-Process -Name ResMode | Wait-Process -Timeout 20;" +
             "Start-Process -FilePath msiexec.exe -ArgumentList '/i','\"" + msi.Replace("'", "''") + "\"','/passive','/norestart' -Wait;" +
-            "if(Test-Path -LiteralPath '" + exe.Replace("'", "''") + "'){Start-Process -FilePath '" + exe.Replace("'", "''") + "' -ArgumentList '/background'}";
+            "if(Test-Path -LiteralPath '" + exe.Replace("'", "''") + "'){Start-Process -FilePath '" + exe.Replace("'", "''") + "'}"; // no /background: the window opens again after the update
         string powershell = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
         Process.Start(new ProcessStartInfo(powershell, "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script))) { UseShellExecute = false, CreateNoWindow = true });
     }

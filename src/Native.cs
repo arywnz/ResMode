@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.5";
+    public const string Release = "0.2.2-alpha.6";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -33,7 +33,7 @@ public class Settings {
     public bool FirstSearchDone = false;
     // History: "all", "games" (game sessions only) or "off"; errors are always kept.
     public string LogLevel = "all";
-    // Looks for a newer GitHub release at startup and twice a day; AnnouncedUpdate keeps the tray balloon to once per version.
+    // Looks for a newer GitHub release at startup and every 15 minutes; AnnouncedUpdate keeps the tray balloon to once per version.
     public bool CheckUpdates = true;
     public string AnnouncedUpdate = "";
     public List<string> IncludedGames = new List<string>();

@@ -377,7 +377,7 @@ public class AppContext : ApplicationContext {
         if (updateWork) return;
         updateWork = true;
         updateManual = manual;
-        nextUpdateCheck = DateTime.UtcNow.AddHours(12);
+        nextUpdateCheck = DateTime.UtcNow.AddMinutes(15);
         if (manual) UpdateMessage = "Procurando…";
         ThreadPool.QueueUserWorkItem(_ => {
             var result = new UpdateResult();

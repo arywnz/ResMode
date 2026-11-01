@@ -4,7 +4,7 @@ Use uma resolução maior nos jogos sem precisar deixar o Windows assim o dia in
 
 ## Baixar
 
-### [⬇ Baixar ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.5/ResMode-0.2.2-alpha.5-win-x64.msi)
+### [⬇ Baixar ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.6/ResMode-0.2.2-alpha.6-win-x64.msi)
 
 Para **Windows 10 ou 11, de 64 bits**. Esta é uma versão de testes. [Outras versões e arquivos](https://github.com/arywnz/ResMode/releases).
 
@@ -38,7 +38,7 @@ O ResMode não tem conta própria, anúncios nem envio automático de logs. A bi
 
 Você pode instalar o app normalmente em outros PCs. Cada instalação cria seus próprios dados; copiar os arquivos protegidos de um usuário ou computador para outro não é uma forma de transferir as configurações. A proteção também não impede o acesso por outro programa que já esteja rodando com a sua conta do Windows.
 
-Para identificar quais itens da Steam são jogos, o app pode consultar a loja com o número público do item. Para avisar de versões novas, ele consulta a lista de releases do GitHub (sem enviar nada seu) ao abrir e a cada 12 horas; o instalador só é executado se o SHA-256 baixado for o publicado no release. As capas e o tempo de jogo são lidos dos arquivos locais da Steam. [Veja os detalhes de privacidade](PRIVACY.md).
+Para identificar quais itens da Steam são jogos, o app pode consultar a loja com o número público do item. Para avisar de versões novas, ele consulta a lista de releases do GitHub (sem enviar nada seu) ao abrir e a cada 15 minutos; o instalador só é executado se o SHA-256 baixado for o publicado no release. As capas e o tempo de jogo são lidos dos arquivos locais da Steam. [Veja os detalhes de privacidade](PRIVACY.md).
 
 ## Remover ou pedir ajuda
 
