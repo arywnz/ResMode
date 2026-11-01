@@ -114,6 +114,10 @@ public static class Catalog {
         }
     }
 
+    // Steam installs runtimes, SDKs and soundtracks next to games; without the store's answer the name has to tell them apart.
+    static readonly Regex SteamTool = new Regex(@"(?i)redistributable|steamworks|linux runtime|^proton\b|steamvr|\bsdk\b|dedicated server|soundtrack|\bost\b|artbook|wallpaper engine|authoring tools|\bmod tools\b|^source filmmaker|spacewar");
+    public static bool LooksLikeSteamTool(string name) { return SteamTool.IsMatch(name ?? ""); }
+
     static List<GameRule> FindExes(string root, string name, string source, Func<bool> stop) {
         var games = new List<GameRule>();
         var queue = new Queue<Tuple<string, int>>();
@@ -143,6 +147,7 @@ public static class Catalog {
         var result = new List<GameRule>();
         Func<bool> stop = delegate { return !force && Native.IdleMs() < 30000; };
 
+        bool storeDown = false; // after one failed store lookup the rest of this scan skips the store
         foreach (string library in SteamLibraries())
             foreach (string manifest in Directory.EnumerateFiles(library, "appmanifest_*.acf")) {
                 if (stop()) throw new OperationCanceledException();
@@ -162,9 +167,13 @@ public static class Catalog {
                         result.AddRange(previous.Games);
                         continue;
                     }
-                    string type = previous != null && previous.Type != "unknown" ? previous.Type : Type(id);
+                    string type = previous != null && previous.Type != "unknown" ? previous.Type : "unknown";
+                    if (type == "unknown" && !storeDown) {
+                        // The store can be unreachable, rate-limited, or not know the app (delisted games); that must not hide the library.
+                        try { type = Type(id); } catch (Exception e) { storeDown = true; Store.Log("Steam Store sem resposta (" + e.Message + "). O resto da biblioteca é identificado pelo nome.", LogKind.Library); }
+                    }
                     var entry = new CatalogEntry { Id = id, Stamp = stamp, Type = type };
-                    if (type == "game" || type == "demo") entry.Games = FindExes(root, name, "Steam:" + id, stop);
+                    if (type == "game" || type == "demo" || (type == "unknown" && !LooksLikeSteamTool(name))) entry.Games = FindExes(root, name, "Steam:" + id, stop);
                     next.Entries.Add(entry);
                     result.AddRange(entry.Games);
                 } catch (OperationCanceledException) {

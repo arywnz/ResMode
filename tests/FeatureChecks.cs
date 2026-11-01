@@ -55,7 +55,8 @@ public static class FeatureChecks {
                 Check(!found.Any(g=>g.Folder.IndexOf("Epic",StringComparison.OrdinalIgnoreCase)>=0),"Achou o launcher ou os serviços da Epic como jogo: "+String.Join(", ",names));
                 Check(names.Contains("Meu Jogo")&&names.Contains("Cool Game")&&names.Contains("Steam Dir"),"Não achou os jogos esperados: "+String.Join(", ",names));
                 Check(!names.Contains("Ferramenta"),"Tomou um programa pequeno por jogo.");
-                results.Add("PASS: Busca ignora o launcher da Epic e acha jogos em pasta de jogos, Unity e steam_appid.txt.");
+                Check(Catalog.LooksLikeSteamTool("Steamworks Common Redistributables")&&Catalog.LooksLikeSteamTool("Proton 9.0")&&Catalog.LooksLikeSteamTool("Steam Linux Runtime 3.0 (sniper)")&&!Catalog.LooksLikeSteamTool("ELDEN RING")&&!Catalog.LooksLikeSteamTool("Resident Evil 6")&&!Catalog.LooksLikeSteamTool("Halo: The Master Chief Collection"),"Filtro de nomes da Steam incorreto.");
+            results.Add("PASS: Busca ignora o launcher da Epic e acha jogos em pasta de jogos, Unity e steam_appid.txt.");
             }finally{try{Directory.Delete(root,true);}catch{}}
         }
         var tintMethod=typeof(Artwork).GetMethod("Tint",BindingFlags.NonPublic|BindingFlags.Static);
