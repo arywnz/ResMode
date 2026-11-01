@@ -17,7 +17,17 @@ public class Painted : Control {
     }
     void Hover(float target) { Motion.To(Tuple.Create(this, "hover"), hoverT, target, Motion.Fast, v => { hoverT = v; Invalidate(); }); }
     protected override void OnMouseEnter(EventArgs e) { Hover(1); base.OnMouseEnter(e); }
-    protected override void OnMouseLeave(EventArgs e) { Hover(0); base.OnMouseLeave(e); }
+    protected override void OnMouseLeave(EventArgs e) { Hover(0); Press(0); base.OnMouseLeave(e); }
+
+    // Pressed state (0..1), for controls that opt in: it sinks the button, stretches a switch's thumb, etc.
+    protected float pressT;
+    protected virtual bool TracksPress { get { return false; } }
+    void Press(float target) {
+        if (!TracksPress || pressT == target) return;
+        Motion.To(Tuple.Create(this, "pressed"), pressT, target, target > 0 ? Motion.Fast : Motion.Normal, v => { pressT = v; Invalidate(); });
+    }
+    protected override void OnMouseDown(MouseEventArgs e) { if (e.Button == MouseButtons.Left) Press(1); base.OnMouseDown(e); }
+    protected override void OnMouseUp(MouseEventArgs e) { Press(0); base.OnMouseUp(e); }
     protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
     protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
     protected Color ParentColor { get { return Parent != null ? Parent.BackColor : Theme.Base; } }
@@ -49,6 +59,7 @@ public class FlatButton : Painted {
     public string Glyph;
     public bool AlignLeft; // menu-style rows: glyph and text from the left edge
     protected override bool Reveals { get { return true; } }
+    protected override bool TracksPress { get { return true; } }
     public FlatButton() { Cursor = Cursors.Hand; TabStop = true; Font = Theme.Body(10, true); Height = Theme.S(36); }
     protected override void OnKeyDown(KeyEventArgs e) {
         if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space) OnClick(EventArgs.Empty);
@@ -65,25 +76,37 @@ public class FlatButton : Painted {
         g.Clear(ParentColor);
         Theme.Smooth(g);
         var r = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
-        float radius = Theme.S(8);
+        float radius = Theme.S(9);
         Color fill, ink;
         if (Kind == ButtonKind.Primary) { fill = Theme.Mix(Theme.Accent, Color.White, 0.18f * hoverT); ink = Theme.AccentInk; }
         else if (Kind == ButtonKind.Secondary) { fill = Theme.Mix(Theme.Raised, Color.FromArgb(34, 37, 46), hoverT); ink = Theme.Text; }
         else { fill = Theme.Mix(ParentColor, Theme.Raised, hoverT); ink = Ink != Color.Empty ? Ink : Theme.Mix(Theme.Muted, Theme.Text, hoverT); }
         if (!Enabled) { fill = Kind == ButtonKind.Quiet ? ParentColor : Theme.Surface; ink = Theme.Faint; }
-        Theme.Fill(g, r, radius, fill);
-        if (Kind == ButtonKind.Secondary) Theme.Stroke(g, r, radius, Theme.Border);
-        // White light would vanish on the platinum primary button; that one brightens through its fill instead.
-        if (Kind != ButtonKind.Primary) using (var path = Theme.Round(r, radius)) Reveal(g, path);
+        fill = Theme.Mix(fill, Color.Black, 0.16f * pressT);
+        bool raised = Enabled && Kind != ButtonKind.Quiet;
+        using (var path = Theme.Round(r, radius)) {
+            if (raised) {
+                // A soft top-to-bottom gradient and a bright hairline along the top edge give the button some body.
+                Color top = Theme.Mix(fill, Color.White, Kind == ButtonKind.Primary ? 0.12f : 0.045f), bottom = Theme.Mix(fill, Color.Black, Kind == ButtonKind.Primary ? 0.06f : 0.1f);
+                using (var body = new LinearGradientBrush(new RectangleF(0, 0, Width, Height + 1), top, bottom, 90f)) g.FillPath(body, path);
+                using (var sheen = new Pen(Color.FromArgb(Kind == ButtonKind.Primary ? 110 : 22, 255, 255, 255))) g.DrawLine(sheen, radius * 0.8f, 1.5f, Width - radius * 0.8f, 1.5f);
+            } else {
+                using (var flat = new SolidBrush(fill)) g.FillPath(flat, path);
+            }
+            if (Kind == ButtonKind.Secondary) Theme.Stroke(g, r, radius, Enabled ? Theme.Mix(Theme.Border, Color.FromArgb(70, 75, 88), hoverT) : Theme.Border);
+            // White light would vanish on the platinum primary button; that one brightens through its fill instead.
+            if (Kind != ButtonKind.Primary) Reveal(g, path);
+        }
         FocusRing(g, r, radius);
 
+        int dy = (int)Math.Round(Theme.S(1) * pressT); // the label sinks a hair with the button
         bool hasText = !String.IsNullOrEmpty(Text), hasGlyph = !String.IsNullOrEmpty(Glyph);
-        if (!hasText) { using (var f = Theme.Glyphs(10.5f)) Theme.DrawGlyph(g, Glyph, f, ink, ClientRectangle); return; }
+        if (!hasText) { using (var f = Theme.Glyphs(10.5f)) Theme.DrawGlyph(g, Glyph, f, ink, new Rectangle(0, dy, Width, Height)); return; }
         int glyphW = hasGlyph ? Theme.S(16) : 0, gap = hasGlyph ? Theme.S(8) : 0;
         int textW = TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.NoPadding).Width;
         int x = AlignLeft ? Theme.S(12) : (Width - glyphW - gap - textW) / 2;
-        if (hasGlyph) using (var f = Theme.Glyphs(10.5f)) Theme.DrawGlyph(g, Glyph, f, ink, new Rectangle(x, 0, glyphW, Height));
-        TextRenderer.DrawText(g, Text, Font, new Rectangle(x + glyphW + gap, 0, textW + Theme.S(4), Height), ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+        if (hasGlyph) using (var f = Theme.Glyphs(10.5f)) Theme.DrawGlyph(g, Glyph, f, ink, new Rectangle(x, dy, glyphW, Height));
+        TextRenderer.DrawText(g, Text, Font, new Rectangle(x + glyphW + gap, dy, textW + Theme.S(4), Height), ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
     }
 }
 
@@ -92,12 +115,15 @@ public class ToggleSwitch : Painted {
     float onT;
     public event EventHandler CheckedChanged;
     protected override bool Reveals { get { return true; } }
+    protected override bool TracksPress { get { return true; } }
     public ToggleSwitch() { Size = new Size(Theme.S(42), Theme.S(24)); Cursor = Cursors.Hand; TabStop = true; }
     public bool Checked {
         get { return on; }
         set {
             if (on == value) return;
             on = value;
+            // Before the switch is on screen (a modal being built) there is nothing to animate: start in place.
+            if (!IsHandleCreated || !Visible) { onT = on ? 1 : 0; return; }
             Motion.To(Tuple.Create(this, "on"), onT, on ? 1 : 0, Motion.Normal, v => { onT = v; Invalidate(); });
         }
     }
@@ -116,9 +142,10 @@ public class ToggleSwitch : Painted {
         Theme.Fill(g, r, Height / 2f, Theme.Mix(off, Theme.Accent, onT));
         using (var path = Theme.Round(r, Height / 2f)) Reveal(g, path, (int)(30 * (1 - onT)), 150);
         FocusRing(g, r, Height / 2f);
-        float d = Height - Theme.S(8);
-        float x = Theme.S(4) + (Width - d - Theme.S(8)) * onT;
-        using (var b = new SolidBrush(Theme.Mix(Theme.Muted, Theme.AccentInk, onT))) g.FillEllipse(b, x, Theme.S(4), d, d);
+        // The thumb stretches while pressed, like Windows 11's switches.
+        float d = Height - Theme.S(8), stretch = d * 0.3f * pressT;
+        float x = Theme.S(4) + (Width - d - stretch - Theme.S(8)) * onT;
+        Theme.Fill(g, new RectangleF(x, Theme.S(4), d + stretch, d), d / 2f, Theme.Mix(Theme.Muted, Theme.AccentInk, onT));
     }
 }
 
@@ -176,8 +203,8 @@ public class SelectList : ScrollSurface {
     int hot;
     float reveal;
     public event Action<object> Picked;
-    int RowH { get { return Theme.S(38); } }
-    int Pad { get { return Theme.S(6); } }
+    int RowH { get { return Theme.S(40); } }
+    int Pad { get { return Theme.S(8); } }
 
     protected override bool Reveals { get { return true; } }
 
@@ -198,12 +225,22 @@ public class SelectList : ScrollSurface {
                 if (li != null && !String.IsNullOrEmpty(li.Detail)) w += TextRenderer.MeasureText(li.Detail, small).Width + Theme.S(12);
                 needed = Math.Max(needed, w);
             }
-        needed += Pad * 2 + Theme.S(10) + Theme.S(34) + (items.Count > 8 ? Theme.S(10) : 0);
+        needed += Pad * 2 + Theme.S(18) + Theme.S(14) + (items.Count > 8 ? Theme.S(10) : 0);
         Size = new Size(Math.Max(width, needed), Math.Min(items.Count, 8) * RowH + Pad * 2);
         hot = items.IndexOf(selected);
     }
 
     public void Reveal(float t) { reveal = t; Invalidate(); }
+
+    // Rows that matter: the chosen one carries a bar on its left edge and a faint fill of its own.
+    void DrawRow(Graphics g, RectangleF row, bool chosen, bool hovered) {
+        if (chosen && !hovered) Theme.Fill(g, row, Theme.S(8), Color.FromArgb(27, 30, 37));
+        if (hovered) {
+            Theme.Fill(g, row, Theme.S(8), Color.FromArgb(36, 39, 48));
+            using (var shape = Theme.Round(row, Theme.S(8))) Reveal(g, shape, 34, 130);
+        }
+        if (chosen) Theme.Fill(g, new RectangleF(row.X + Theme.S(5), row.Y + (row.Height - Theme.S(16)) / 2, Theme.S(3), Theme.S(16)), Theme.S(1.5f), Theme.Accent);
+    }
 
     int At(Point p) {
         int i = (int)Math.Floor((p.Y + offset - Pad) / RowH);
@@ -233,27 +270,22 @@ public class SelectList : ScrollSurface {
         g.Clear(BackColor);
         Theme.Smooth(g);
         int slide = (int)((1 - reveal) * Theme.S(8)), right = Width - Pad - (content > Height ? Theme.S(10) : 0);
-        using (var bold = technical?Theme.Mono(10.5f,true):Theme.Body(10.5f,true)) using (var small = Theme.Mono(9.5f)) using (var check = Theme.Glyphs(9))
+        using (var bold = technical?Theme.Mono(10.5f,true):Theme.Body(10.5f,true)) using (var small = Theme.Mono(9.5f))
             for (int i = 0; i < items.Count; i++) {
                 int y = Pad + i * RowH - (int)offset - slide;
                 if (y + RowH < 0 || y > Height) continue;
                 var r = new Rectangle(Pad, y, right - Pad, RowH);
                 bool chosen = Equals(items[i], selected);
-                if (i == hot) {
-                    var row = new RectangleF(r.X, r.Y + Theme.S(1), r.Width, r.Height - Theme.S(2));
-                    Theme.Fill(g, row, Theme.S(6), Color.FromArgb(36, 39, 48));
-                    using (var shape = Theme.Round(row, Theme.S(6))) Reveal(g, shape, 34, 130);
-                }
+                DrawRow(g, new RectangleF(r.X, r.Y + Theme.S(1), r.Width, r.Height - Theme.S(2)), chosen, i == hot);
                 var li = items[i] as IListItem;
                 string label = li != null ? li.Label : items[i].ToString(), detail = li != null ? li.Detail : null;
-                int textRight = r.Right - Theme.S(34);
-                if (chosen) Theme.DrawGlyph(g, Theme.IconCheck, check, Theme.Accent, new Rectangle(r.Right - Theme.S(30), r.Y, Theme.S(22), r.Height));
+                int textRight = r.Right - Theme.S(14);
                 if (!String.IsNullOrEmpty(detail)) {
                     int dw = TextRenderer.MeasureText(detail, small, Size.Empty, TextFormatFlags.NoPadding).Width;
                     Theme.DrawText(g, detail, small, Theme.Muted, new Rectangle(textRight - dw, r.Y, dw + Theme.S(2), r.Height));
                     textRight -= dw + Theme.S(12);
                 }
-                Theme.DrawText(g, label, chosen ? bold : Font, chosen ? Theme.Accent : Theme.Text, new Rectangle(r.X + Theme.S(10), r.Y, textRight - r.X - Theme.S(10), r.Height));
+                Theme.DrawText(g, label, chosen ? bold : Font, Theme.Text, new Rectangle(r.X + Theme.S(18), r.Y, textRight - r.X - Theme.S(18), r.Height));
             }
         PaintScrollbar(g);
     }
@@ -494,7 +526,7 @@ public class GameGrid : ScrollSurface {
     Point? pointer;
     string pressKey;
     Point pressAt;
-    float pressT, pressDepth;
+    float ringT, pressDepth;
     Bitmap edgeLightImage, glossLightImage, playImage, activePlayImage;
     readonly Dictionary<string, Bitmap> hoverTiles = new Dictionary<string, Bitmap>();
     readonly Queue<string> hoverTileOrder = new Queue<string>();
@@ -647,7 +679,7 @@ public class GameGrid : ScrollSurface {
         if (i >= 0 && e.Button == MouseButtons.Left) {
             pressKey = games[i].Key;
             pressAt = e.Location;
-            Motion.Run(Tuple.Create(this, "press"), 520, t => { pressT = t; Invalidate(); }, () => { pressKey = null; Invalidate(); });
+            Motion.Run(Tuple.Create(this, "press"), 520, t => { ringT = t; Invalidate(); }, () => { pressKey = null; Invalidate(); });
             Motion.To(Tuple.Create(this, "depth"), pressDepth, 1, Motion.Fast, v => { pressDepth = v; Invalidate(); });
         }
         base.OnMouseDown(e);
@@ -769,7 +801,7 @@ public class GameGrid : ScrollSurface {
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.Half;
             var r = new Rectangle(margin, margin, Cover.Width, Cover.Height);
-            Artwork.DrawCoverFrame(g,r,art.Tint,hover);
+            Artwork.DrawCoverGlow(g,r,art.Tint,hover);
             g.DrawImageUnscaled(art.Cover, r.Location);
             using (var path = Theme.Round(r, Artwork.Radius)) {
                 if (game.Excluded) using (var shade = new SolidBrush(Color.FromArgb(170, Theme.Base))) g.FillPath(shade, path);
@@ -842,7 +874,7 @@ public class GameGrid : ScrollSurface {
                 var beforeLift = g.Save();
                 var coverRect = Rectangle.Inflate(new Rectangle(card.X, card.Y, Cover.Width, Cover.Height), -(int)(Theme.S(4) * depth), -(int)(Theme.S(6) * depth));
 
-                if(art!=null)Artwork.DrawCoverFrame(g,coverRect,art.Tint,hov);
+                if(art!=null)Artwork.DrawCoverGlow(g,coverRect,art.Tint,hov);
 
                 using (var path = Theme.Round(coverRect, Artwork.Radius)) {
                     // Art fades in when it finishes loading instead of popping in.
@@ -869,9 +901,9 @@ public class GameGrid : ScrollSurface {
                     }
                     if (game.Excluded) using (var shade = new SolidBrush(Color.FromArgb(170, Theme.Base))) g.FillPath(shade, path);
                     // Hover changes the backdrop only. The press ring remains local to a click.
-                    if (pressed && pressT < 1) {
-                        float r = Theme.S(30) + Cover.Height * 1.1f * Motion.EaseOut(pressT);
-                        using (var ring = Theme.Light(pressAt, r, (int)(90 * (1 - pressT)))) g.FillPath(ring, path);
+                    if (pressed && ringT < 1) {
+                        float r = Theme.S(30) + Cover.Height * 1.1f * Motion.EaseOut(ringT);
+                        using (var ring = Theme.Light(pressAt, r, (int)(90 * (1 - ringT)))) g.FillPath(ring, path);
                     }
                     using (var p = new Pen(Theme.Mix(Color.FromArgb(28, 31, 38), Color.FromArgb(66, 71, 84), hov))) g.DrawPath(p, path);
                     // Reveal border: edges near the pointer catch the light, on this card and its neighbours.

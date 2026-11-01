@@ -10,102 +10,7 @@ public static class Kinds {
     public static Color Color(LogKind k) {
         return k == LogKind.Game ? Theme.Live : k == LogKind.Library ? Theme.Brand : k == LogKind.Error ? Theme.Danger : System.Drawing.Color.FromArgb(160, 166, 180);
     }
-    public static string Label(LogKind k) { return k == LogKind.Game ? "Jogo" : k == LogKind.Library ? "Biblioteca" : k == LogKind.Error ? "Erro" : "Sistema"; }
     public static string Glyph(LogKind k) { return k == LogKind.Game ? "" : k == LogKind.Library ? "" : k == LogKind.Error ? "" : ""; }
-
-    // Coloured pill with the kind's name, e.g. a green "Jogo".
-    public static int Pill(Graphics g, LogKind k, Font f, int x, int cy) {
-        string text = Label(k);
-        int w = TextRenderer.MeasureText(text, f, Size.Empty, TextFormatFlags.NoPadding).Width + Theme.S(16), h = Theme.S(22);
-        var color = Color(k);
-        Theme.Fill(g, new RectangleF(x, cy - h / 2f, w, h), h / 2f, Theme.Mix(Theme.Surface, color, 0.2f));
-        TextRenderer.DrawText(g, text, f, new Rectangle(x, cy - h / 2, w, h), Theme.Mix(color, System.Drawing.Color.White, 0.25f), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
-        return w;
-    }
-}
-
-// History list: day headings, one divided row per entry with a coloured kind pill; repeats fold into "3×".
-public class LogView : ScrollSurface {
-    public class Entry { public DateTime Time; public string Text; public LogKind Kind; public int Repeats = 1; }
-    readonly List<object> rows = new List<object>(); // string = day heading, Entry = line
-    public string EmptyText = "Histórico vazio.";
-    int RowH { get { return Theme.S(46); } }
-    int HeadH { get { return Theme.S(46); } }
-
-    public LogView() { Font = Theme.Body(10.5f); }
-
-    public static Entry Parse(string line) {
-        DateTime t;
-        if (line.Length < 21 || !DateTime.TryParseExact(line.Substring(0, 19), "yyyy-MM-ddTHH:mm:ss", CultureInfo.InvariantCulture, DateTimeStyles.None, out t)) return null;
-        string rest = line.Substring(20);
-        var kind = LogKind.System;
-        if (rest.StartsWith("[")) {
-            int end = rest.IndexOf(']');
-            string tag = end > 0 ? rest.Substring(1, end - 1) : "";
-            for (int i = 0; i < 4; i++) if (Store.Tag((LogKind)i) == tag) kind = (LogKind)i;
-            rest = end > 0 ? rest.Substring(end + 1).TrimStart() : rest;
-        } else if (rest.StartsWith("Erro") || rest.StartsWith("Falha") || rest.Contains("Exception")) kind = LogKind.Error;
-        return new Entry { Time = t, Text = rest, Kind = kind };
-    }
-
-    public void SetEntries(IEnumerable<Entry> newestFirst) {
-        rows.Clear();
-        DateTime day = DateTime.MinValue;
-        Entry last = null;
-        var culture = new CultureInfo("pt-BR");
-        foreach (var src in newestFirst) {
-            if (last != null && last.Text == src.Text && last.Kind == src.Kind && last.Time.Date == src.Time.Date) { last.Repeats++; continue; }
-            var e = new Entry { Time = src.Time, Text = src.Text, Kind = src.Kind };
-            if (e.Time.Date != day) {
-                day = e.Time.Date;
-                string label = day == DateTime.Today ? "Hoje" : day == DateTime.Today.AddDays(-1) ? "Ontem" : day.ToString("dddd, d 'de' MMMM", culture);
-                rows.Add(Char.ToUpper(label[0]) + label.Substring(1));
-            }
-            rows.Add(e);
-            last = e;
-        }
-        content = rows.Sum(r => r is string ? HeadH : RowH);
-        Clamp();
-        Invalidate();
-    }
-
-    protected override void OnPaint(PaintEventArgs e) {
-        var g = e.Graphics;
-        g.Clear(BackColor);
-        Theme.Smooth(g);
-        if (rows.Count == 0) {
-            Theme.DrawText(g, EmptyText, Font, Theme.Muted, new Rectangle(0, Theme.S(8), Width, Theme.S(30)));
-            return;
-        }
-        int y = -(int)offset, w = Width - Theme.S(14);
-        using (var head = Theme.Body(11, true)) using (var time = Theme.Mono(10)) using (var small = Theme.Body(9, true)) using(var repeat=Theme.Mono(9.5f,true)) using (var line = new Pen(Theme.Border))
-            for (int i = 0; i < rows.Count; i++) {
-                var heading = rows[i] as string;
-                int rh = heading != null ? HeadH : RowH;
-                if (y + rh >= 0 && y <= Height) {
-                    if (heading != null) {
-                        Theme.DrawText(g, heading, head, Theme.Text, new Rectangle(0, y + Theme.S(12), w, Theme.S(26)));
-                    } else {
-                        var entry = (Entry)rows[i];
-                        int cy = y + rh / 2;
-                        Theme.DrawText(g, entry.Time.ToString("HH:mm"), time, Theme.Muted, new Rectangle(0, y, Theme.S(48), rh));
-                        int pw = Kinds.Pill(g, entry.Kind, small, Theme.S(52), cy);
-                        int tx = Theme.S(52) + Math.Max(pw, Theme.S(86)) + Theme.S(12), tw = w - tx;
-                        if (entry.Repeats > 1) {
-                            string n = entry.Repeats + "×";
-                            int cw = TextRenderer.MeasureText(n, repeat).Width + Theme.S(8);
-                            Theme.Fill(g, new RectangleF(w - cw, cy - Theme.S(11), cw, Theme.S(22)), Theme.S(11), Theme.Raised);
-                            Theme.DrawText(g, n, repeat, Theme.Muted, new Rectangle(w - cw, y, cw, rh), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
-                            tw -= cw + Theme.S(8);
-                        }
-                        Theme.DrawText(g, entry.Text, Font, Theme.Text, new Rectangle(tx, y, tw, rh));
-                        g.DrawLine(line, 0, y + rh - 1, w, y + rh - 1);
-                    }
-                }
-                y += rh;
-            }
-        PaintScrollbar(g);
-    }
 }
 
 // Bell with an unread badge.
@@ -266,7 +171,7 @@ public class NoticeList : Painted {
     sealed class NoticeBody : ScrollSurface {
         sealed class Row {
             public AppContext.Notice Notice;
-            public int Top, Height, TitleHeight, TextHeight;
+            public int Top, Height, TitleHeight, TextHeight, TimeHeight, ActionWidth;
         }
         readonly List<Row> rows = new List<Row>();
         List<AppContext.Notice> notices = new List<AppContext.Notice>();
@@ -275,7 +180,45 @@ public class NoticeList : Painted {
         const TextFormatFlags Wrap = TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.TextBoxControl;
         int TextLeft { get { return Theme.S(56); } }
 
+        readonly Font actionFont = Theme.Body(9.5f, true);
+        Row hoverAction;
+
         public NoticeBody() { Font = Theme.Body(10); }
+
+        // The "Atualizar agora" pill on the time line of a notice that carries an action.
+        Rectangle ActionRect(Row row) {
+            int y = row.Top - (int)offset;
+            int timeY = y + Theme.S(14) + row.TitleHeight + (row.TextHeight > 0 ? Theme.S(6) + row.TextHeight : 0) + Theme.S(10);
+            int h = Theme.S(26);
+            return new Rectangle(Width - Theme.S(12) - Theme.S(12) - row.ActionWidth, timeY + row.TimeHeight / 2 - h / 2, row.ActionWidth, h);
+        }
+
+        Row ActionAt(Point p) {
+            foreach (var row in rows) if (row.ActionWidth > 0 && ActionRect(row).Contains(p)) return row;
+            return null;
+        }
+
+        protected override void OnMouseMove(MouseEventArgs e) {
+            base.OnMouseMove(e);
+            var over = ActionAt(e.Location);
+            if (over != hoverAction) { hoverAction = over; Cursor = over != null ? Cursors.Hand : Cursors.Default; Invalidate(); }
+        }
+
+        protected override void OnMouseLeave(EventArgs e) {
+            base.OnMouseLeave(e);
+            if (hoverAction != null) { hoverAction = null; Cursor = Cursors.Default; Invalidate(); }
+        }
+
+        protected override void OnMouseClick(MouseEventArgs e) {
+            base.OnMouseClick(e);
+            var row = e.Button == MouseButtons.Left ? ActionAt(e.Location) : null;
+            if (row != null) row.Notice.Action();
+        }
+
+        protected override void Dispose(bool disposing) {
+            if (disposing) actionFont.Dispose();
+            base.Dispose(disposing);
+        }
         public void SetNotices(List<AppContext.Notice> items) {
             notices = items;
             Initialized = true;
@@ -294,7 +237,8 @@ public class NoticeList : Painted {
                     int titleHeight = TextRenderer.MeasureText(notice.Title ?? "", title, new Size(textWidth, Int32.MaxValue), Wrap).Height;
                     int textHeight = String.IsNullOrEmpty(notice.Text) ? 0 : TextRenderer.MeasureText(notice.Text, Font, new Size(textWidth, Int32.MaxValue), Wrap).Height;
                     int height = Theme.S(14) + titleHeight + (textHeight > 0 ? Theme.S(6) + textHeight : 0) + Theme.S(10) + time.Height + Theme.S(14);
-                    rows.Add(new Row { Notice = notice, Top = y, Height = height, TitleHeight = titleHeight, TextHeight = textHeight });
+                    int actionWidth = notice.Action == null ? 0 : TextRenderer.MeasureText(notice.ActionText ?? "", actionFont, Size.Empty, TextFormatFlags.NoPadding).Width + Theme.S(28);
+                    rows.Add(new Row { Notice = notice, Top = y, Height = height, TitleHeight = titleHeight, TextHeight = textHeight, TimeHeight = time.Height, ActionWidth = actionWidth });
                     y += height + Theme.S(10);
                 }
             }
@@ -361,6 +305,12 @@ public class NoticeList : Painted {
                     var n = row.Notice;
                     string when = n.Time.Date == DateTime.Today ? "Hoje às " + n.Time.ToString("HH:mm") : n.Time.ToString("dd/MM 'às' HH:mm");
                     TextRenderer.DrawText(g, when, time, new Rectangle(TextLeft, textY + Theme.S(10), textWidth, time.Height), Theme.Muted, TextFormatFlags.Left | TextFormatFlags.Top | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
+                    if (row.ActionWidth > 0) {
+                        var pill = ActionRect(row);
+                        bool hot = row == hoverAction;
+                        Theme.Fill(g, pill, pill.Height / 2f, hot ? Theme.Accent : Theme.Mix(Theme.Surface, Theme.Accent, .16f));
+                        TextRenderer.DrawText(g, n.ActionText ?? "", actionFont, pill, hot ? Theme.AccentInk : Theme.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
+                    }
                 }
             }
             PaintScrollbar(g);
@@ -372,16 +322,13 @@ public class NoticeList : Painted {
 // While the game is running it turns into a calm "Em jogo" with a live dot.
 public class PlayButton : FlatButton {
     public bool Live;
-    float press;
     public PlayButton() { Height = Theme.S(48); Font = Theme.Body(11.5f, true); }
-    protected override void OnMouseDown(MouseEventArgs e) { Motion.To(Tuple.Create(this, "press"), press, 1, Motion.Fast, v => { press = v; Invalidate(); }); base.OnMouseDown(e); }
-    protected override void OnMouseUp(MouseEventArgs e) { Motion.To(Tuple.Create(this, "press"), press, 0, Motion.Normal, v => { press = v; Invalidate(); }); base.OnMouseUp(e); }
 
     protected override void OnPaint(PaintEventArgs e) {
         var g = e.Graphics;
         g.Clear(ParentColor);
         Theme.Smooth(g);
-        float inset = Theme.S(2) * press;
+        float inset = Theme.S(2) * pressT;
         var r = new RectangleF(0.5f + inset, 0.5f + inset, Width - 1 - inset * 2, Height - 1 - inset * 2);
         float radius = Theme.S(10);
         int textW = TextRenderer.MeasureText(Text, Font, Size.Empty, TextFormatFlags.NoPadding).Width;

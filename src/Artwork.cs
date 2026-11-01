@@ -11,14 +11,14 @@ using System.Runtime.InteropServices;
 
 // Cover art from the local Steam library cache, or the game's own icon. Nothing is downloaded.
 public static class Artwork {
-    // Only the cover frame uses a dominant colour from the original cover pixels.
+    // Only the soft halo around the cover uses its dominant artwork colour.
     // LoadedTicks: when the art became available, so the grid can fade it in instead of popping.
     // Cover comes with its rounded corners already cut (premultiplied alpha), so the grid copies it as is
     // every frame, without clipping, hover filters or resampling.
     public class Art { public Image Cover; public Image Icon; public Color Tint = Theme.Accent; public long LoadedTicks = DateTime.UtcNow.Ticks; }
 
     public static int Radius { get { return Theme.S(10); } }
-    public static int CardMargin { get { return Theme.S(8); } }
+    public static int CardMargin { get { return Theme.S(14); } }
 
     static readonly Dictionary<string, Art> cache = new Dictionary<string, Art>();
     static string libraryCache;
@@ -137,15 +137,21 @@ public static class Artwork {
         }
     }
 
-    // A crisp outer frame around the image only. Labels and cover pixels are not tinted.
-    public static void DrawCoverFrame(Graphics g,Rectangle cover,Color tint,float amount){
+    // Layered, fading light behind the cover, cached by the grid with each hover level.
+    // A broad lateral falloff and shorter vertical falloff keep the light above the labels.
+    public static void DrawCoverGlow(Graphics g,Rectangle cover,Color tint,float amount){
         amount=Math.Max(0,Math.Min(1,amount));if(amount<=0)return;
-        // Keep dark covers' hue/channel ratios while making their thin frame readable on black.
+        // Preserve dark artwork's channel ratios while keeping its low-opacity light visible.
         int peak=Math.Max(tint.R,Math.Max(tint.G,tint.B));
-        if(peak>0&&peak<112)tint=Color.FromArgb(tint.R*112/peak,tint.G*112/peak,tint.B*112/peak);
-        var frame=Rectangle.Inflate(cover,Theme.S(4),Theme.S(4));
-        using(var path=Theme.Round(frame,Radius+Theme.S(4)))
-        using(var fill=new SolidBrush(Color.FromArgb((int)(230*amount),tint)))
-        using(var edge=new Pen(Color.FromArgb((int)(255*amount),tint),Theme.S(1))){g.FillPath(fill,path);g.DrawPath(edge,path);}
+        if(peak>0&&peak<210)tint=Color.FromArgb(tint.R*210/peak,tint.G*210/peak,tint.B*210/peak);
+        int spread=Theme.S(12);
+        for(int distance=spread;distance>=1;distance--){
+            float strength=(spread-distance+1f)/spread;
+            int alpha=(int)Math.Round(72*amount*strength*strength);
+            if(alpha==0)continue;
+            int vertical=(int)Math.Round(distance*7f/12f);
+            using(var path=Theme.Round(Rectangle.Inflate(cover,distance,vertical),Radius+vertical))
+            using(var fill=new SolidBrush(Color.FromArgb(alpha,tint)))g.FillPath(fill,path);
+        }
     }
 }

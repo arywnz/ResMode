@@ -80,7 +80,7 @@ public class AppContext : ApplicationContext {
         if (existingSession) Store.Log("Um jogo já estava aberto. A troca fica para a próxima vez.", LogKind.Game);
 
         timer = new System.Windows.Forms.Timer { Interval = IdleInterval };
-        timer.Tick += delegate { Tick(); };
+        timer.Tick += delegate { Tick(); PollUpdate(); };
         timer.Start();
         SystemEvents.SessionEnding += SessionEnding;
         Store.Log(AppInfo.Name + " aberto.");
@@ -99,7 +99,11 @@ public class AppContext : ApplicationContext {
         menu.Items.Add(status);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Abrir " + AppInfo.Name, null, delegate { ShowDashboard(); });
-        pause = new ToolStripMenuItem("Pausar", null, delegate { SetPaused(!paused); });
+        updateItem = new ToolStripMenuItem("", null, delegate {
+            try { InstallUpdate(); } catch (Exception e) { MessageBox.Show(e.Message, AppInfo.Name); }
+        }) { Visible = false };
+        menu.Items.Add(updateItem);
+        pause =new ToolStripMenuItem("Pausar", null, delegate { SetPaused(!paused); });
         menu.Items.Add(pause);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Sair", null, delegate {
@@ -107,6 +111,9 @@ public class AppContext : ApplicationContext {
         });
         tray.ContextMenuStrip = menu;
         tray.DoubleClick += delegate { ShowDashboard(); };
+        // Only the update balloon opens the window when clicked, not the "game switched" ones.
+        tray.BalloonTipClicked += delegate { if (updateBalloon) { updateBalloon = false; ShowDashboard(); } };
+        tray.BalloonTipClosed += delegate { updateBalloon = false; };
         tray.Visible = true;
     }
 
@@ -286,15 +293,129 @@ public class AppContext : ApplicationContext {
     }
 
     // In-app notifications shown under the bell; kept for this session only.
-    public class Notice { public DateTime Time; public string Title, Text; public LogKind Kind; }
+    public class Notice { public DateTime Time; public string Title, Text, ActionText; public LogKind Kind; public Action Action; }
     public readonly List<Notice> Notices = new List<Notice>();
     bool restoreFailed;
     public int Unread { get; private set; }
 
-    public void Notify(string title, string text, LogKind kind) {
-        Notices.Insert(0, new Notice { Time = DateTime.Now, Title = title, Text = text, Kind = kind });
+    public Notice Notify(string title, string text, LogKind kind) {
+        var notice = new Notice { Time = DateTime.Now, Title = title, Text = text, Kind = kind };
+        Notices.Insert(0, notice);
         if (Notices.Count > 50) Notices.RemoveAt(Notices.Count - 1);
         Unread++;
+        return notice;
+    }
+
+    // ---- Updates: a newer GitHub release is announced in the bell, the tray and Settings ----
+    sealed class UpdateResult { public UpdateOffer Offer; public string Path; public Exception Error; public bool Download; }
+    volatile UpdateResult updateResult; // written by the worker thread, picked up by the timer on the UI thread
+    bool updateWork, updateManual, updateBalloon;
+    DateTime nextUpdateCheck = DateTime.UtcNow.AddSeconds(30);
+    string downloadedUpdate;
+    Notice updateNotice;
+    ToolStripMenuItem updateItem;
+
+    public UpdateOffer Update { get; private set; }
+    public string UpdateMessage { get; private set; }
+    public bool UpdateBusy { get { return updateWork; } }
+    // Only a copy installed by the MSI can be replaced by the next MSI; anything else opens the release page.
+    public bool UpdateInPlace { get { return Update != null && Update.CanDownload && Updater.IsInstalled; } }
+
+    void SayUpdate(string text) {
+        UpdateMessage = text;
+        if (updateNotice != null) updateNotice.Text = text;
+    }
+
+    public void SetCheckUpdates(bool enabled) {
+        config.CheckUpdates = enabled;
+        Store.SaveSettings(config);
+        if (enabled) nextUpdateCheck = DateTime.UtcNow.AddSeconds(5);
+    }
+
+    public void CheckForUpdates(bool manual) {
+        if (updateWork) return;
+        updateWork = true;
+        updateManual = manual;
+        nextUpdateCheck = DateTime.UtcNow.AddHours(12);
+        if (manual) UpdateMessage = "Procurando…";
+        ThreadPool.QueueUserWorkItem(_ => {
+            var result = new UpdateResult();
+            try { result.Offer = Updater.Check(); } catch (Exception e) { result.Error = e; }
+            updateResult = result;
+        });
+    }
+
+    void PollUpdate() {
+        var result = updateResult;
+        if (result == null) {
+            // Not while a game runs: the network stays quiet during play.
+            if (!updateWork && config.CheckUpdates && DateTime.UtcNow >= nextUpdateCheck && !active && RunningNames.Count == 0) CheckForUpdates(false);
+            return;
+        }
+        updateResult = null;
+        updateWork = false;
+        if (result.Download) { FinishDownload(result); return; }
+        if (result.Error != null) {
+            Store.Log("Não deu para procurar atualização: " + result.Error.Message, LogKind.System);
+            if (updateManual) SayUpdate("Sem resposta do GitHub.");
+            return;
+        }
+        if (result.Offer == null) {
+            if (updateManual) SayUpdate("Você está em dia.");
+            return;
+        }
+        if (Update != null && Update.Version == result.Offer.Version) { if (updateManual) SayUpdate("Versão " + Update.Version + " disponível."); return; }
+        Update = result.Offer;
+        downloadedUpdate = null;
+        Store.Log("Versão " + Update.Version + " disponível.", LogKind.System);
+        UpdateMessage = "Versão " + Update.Version + " disponível.";
+        updateNotice = Notify("Nova versão disponível", AppInfo.Name + " " + Update.Version + " já saiu. Você está na " + AppInfo.Release + ".", LogKind.Library);
+        updateNotice.ActionText = UpdateInPlace ? "Atualizar agora" : "Ver no GitHub";
+        updateNotice.Action = delegate {
+            try { InstallUpdate(); } catch (Exception e) { SayUpdate(e.Message); }
+        };
+        if (updateItem != null) { updateItem.Text = (UpdateInPlace ? "Atualizar para " : "Nova versão ") + Update.Version; updateItem.Visible = true; }
+        if (config.AnnouncedUpdate != Update.Version) {
+            config.AnnouncedUpdate = Update.Version;
+            Store.SaveSettings(config);
+            updateBalloon = true;
+            tray.ShowBalloonTip(8000, "Nova versão do " + AppInfo.Name, Update.Version + " já saiu. Clique para ver.", ToolTipIcon.None);
+        }
+    }
+
+    public void InstallUpdate() {
+        var offer = Update;
+        if (offer == null) throw new Exception("Nenhuma atualização para instalar.");
+        if (!UpdateInPlace) { Updater.OpenPage(offer); return; }
+        if (updateWork) return;
+        if (active || Running().Count > 0) throw new Exception("Feche o jogo antes de atualizar.");
+        if (downloadedUpdate != null && File.Exists(downloadedUpdate)) { ApplyUpdate(downloadedUpdate); return; }
+        updateWork = true;
+        SayUpdate("Baixando " + offer.Version + "…");
+        ThreadPool.QueueUserWorkItem(_ => {
+            var result = new UpdateResult { Download = true };
+            try { result.Path = Updater.Download(offer); } catch (Exception e) { result.Error = e; }
+            updateResult = result;
+        });
+    }
+
+    void FinishDownload(UpdateResult result) {
+        if (result.Error != null) {
+            Store.Log("Não deu para baixar a atualização: " + result.Error.Message, LogKind.Error);
+            SayUpdate(result.Error is System.IO.IOException ? result.Error.Message : "Não deu para baixar. Tente de novo em instantes.");
+            return;
+        }
+        downloadedUpdate = result.Path;
+        try { ApplyUpdate(result.Path); } catch (Exception e) { SayUpdate(e.Message); }
+    }
+
+    // Puts the desktop back, hands the MSI to a helper that waits for this process to end, and quits.
+    void ApplyUpdate(string msi) {
+        if (active || Running().Count > 0) throw new Exception("Baixada. Feche o jogo e atualize de novo.");
+        if (!Restore()) throw new Exception("Não deu para voltar à resolução normal. Gere o log nas Configurações.");
+        Store.Log("Instalando a versão " + Update.Version + ".", LogKind.System);
+        Updater.Install(msi, Process.GetCurrentProcess().Id);
+        ExitThread();
     }
 
     public void MarkNoticesRead() { Unread = 0; }
@@ -314,10 +435,6 @@ public class AppContext : ApplicationContext {
         config.LogLevel = level;
         Store.LogLevel = level;
         SaveConfiguration();
-    }
-
-    public void ClearLog() {
-        foreach (string f in Directory.GetFiles(Store.Root, AppInfo.LogName + "*")) File.Delete(f);
     }
 
     string LibrarySignature() { return String.Join("|", config.Games.Select(g => g.Exe).OrderBy(x => x, StringComparer.OrdinalIgnoreCase)); }
@@ -390,7 +507,7 @@ public class AppContext : ApplicationContext {
         bool wasActive = active;
         bool ok = Store.Restore();
         active = File.Exists(Store.State);
-        if (!ok && !restoreFailed) Notify("A resolução não voltou ao normal", "O monitor não aceitou a troca. O app continua tentando; veja a aba Atividade.", LogKind.Error);
+        if (!ok && !restoreFailed) Notify("A resolução não voltou ao normal", "O monitor não aceitou a troca. O app continua tentando; se não voltar, gere o log nas Configurações.", LogKind.Error);
         restoreFailed = !ok;
         if (ok) {
             emptySince = DateTime.MinValue;
@@ -470,14 +587,14 @@ public class AppContext : ApplicationContext {
         nextShellCheck = DateTime.MinValue;
     }
 
-    public void OpenLog() {
-        if (!File.Exists(Store.LogFile)) Store.Log("Registro iniciado.");
-        LogWindow.ShowLog();
+    // Writes the history as a .txt in Documents\ResMode and opens that folder with the file selected.
+    public void ExportLog() {
+        LogExport.Reveal(LogExport.Create(config, Device()));
     }
 
     public void Quit() {
         if (Running().Count > 0) throw new Exception("Feche o jogo antes de sair.");
-        if (!Restore()) throw new Exception("Não deu para voltar à resolução normal. Veja o Histórico nas Configurações.");
+        if (!Restore()) throw new Exception("Não deu para voltar à resolução normal. Gere o log nas Configurações.");
         ExitThread();
     }
 
