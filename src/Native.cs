@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.7";
+    public const string Release = "0.2.2-alpha.8";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -66,6 +66,16 @@ public static class Native {
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr handle);
     [DllImport("psapi.dll")] static extern bool EnumProcesses([Out] uint[] ids, int size, out int needed);
     [DllImport("kernel32.dll")] static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr min, IntPtr max);
+
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint pid);
+
+    // Process that owns the window in front right now; 0 when there is none.
+    public static uint ForegroundPid() {
+        uint pid;
+        IntPtr window = GetForegroundWindow();
+        return window != IntPtr.Zero && GetWindowThreadProcessId(window, out pid) != 0 ? pid : 0;
+    }
 
     public static long IdleMs() {
         var v = new LastInput { size = 8 };

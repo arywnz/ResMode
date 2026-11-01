@@ -516,10 +516,13 @@ public class AppContext : ApplicationContext {
         try {
             var now = Native.Current(Device());
             if (now.width != config.DesktopWidth || now.height != config.DesktopHeight || (now.width == config.Width && now.height == config.Height)) { revertedSince = DateTime.MinValue; return; }
+            // Only when the person is back in the game. Changing the mode while the game is in the background makes it
+            // hand the desktop back again right away (Red Dead did it every few seconds), so it waits for the game's window.
+            if (!DesktopLayout.GamePids(config.Games).Contains(Native.ForegroundPid())) { revertedSince = DateTime.MinValue; return; }
             if (revertedSince == DateTime.MinValue) { revertedSince = DateTime.Now; return; }
             if ((DateTime.Now - revertedSince).TotalSeconds < 2) return;
             if ((DateTime.Now - modeWindow).TotalMinutes > 2) { modeWindow = DateTime.Now; modeRestores = 0; modeGaveUp = false; }
-            if (modeRestores >= 5) {
+            if (modeRestores >= 3) {
                 if (!modeGaveUp) { modeGaveUp = true; Store.Log("O jogo desfez a resolução várias vezes seguidas; o app parou de reaplicar por alguns minutos.", LogKind.Error); }
                 return;
             }
