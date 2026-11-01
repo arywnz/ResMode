@@ -24,6 +24,8 @@ public static class Program {
         Store.UseUserData();
         switch (command) {
             case "/guard": Guard(Int32.Parse(arg)); return;
+            case "/shellguard": ShellRefresh.Guard(Int32.Parse(arg),args[2]); return;
+            case "/shellrefresh": ShellRefresh.TryRun(System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(arg))); return;
             case "/restore": Store.Restore(); return;
         }
         Run(args.Contains("/background"));
@@ -78,6 +80,8 @@ public static class Program {
         var results = new List<string>();
         DesktopLayout.GeometryTests();
         results.Add("PASS: coordenadas relativas nos monitores à direita/negativas, ida e volta e WINDOWPLACEMENT.");
+        ShellRefresh.ReadinessTests();
+        results.Add("PASS: Explorer só pronto com área de trabalho e barra responsivas no mesmo processo e estáveis; PID isolado não confirma recuperação.");
 
         var helpers = new[] {
             @"C:\Games\Game\createdump.exe", @"C:\Games\Game\crs-handler.exe", @"C:\Games\Game\launcher.exe",

@@ -153,6 +153,8 @@ public class AppContext : ApplicationContext {
             var games = Running();
             RunningNames = games;
             Playtime.Update(games.Select(n => config.Games.FirstOrDefault(g => g.Name == n)).Where(g => g != null).Select(GamePreferences.Key).Distinct());
+            // If a game starts during shell recovery, leave that existing session's resolution alone.
+            if(ShellRefresh.IsBusy){if(games.Count>0)existingSession=true;return;}
             string text = String.Join(", ", games);
 
             if (games.Count > 0) {
@@ -223,7 +225,7 @@ public class AppContext : ApplicationContext {
 
             if (games.Count == 0 && !active && ShellRefresh.IsPending && DateTime.Now >= nextShellCheck) {
                 nextShellCheck = DateTime.Now.AddSeconds(10);
-                ShellRefresh.TryRun(Device());
+                ShellRefresh.Begin(Device());
             }
 
             if (games.Count == 0 && !active) DesktopLayout.ResumeDesktopRestore();

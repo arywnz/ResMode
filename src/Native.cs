@@ -22,7 +22,7 @@ public class Settings {
     // Last desktop mode seen before switching to the game resolution; 0 = read from the monitor on first run.
     public int DesktopWidth, DesktopHeight;
     public string Display = "";
-    public bool AutoRefreshTaskbar = true;
+    public bool AutoRefreshTaskbar = false;
     public bool StartPaused = false;
     // Competitive games stay at the desktop resolution unless the user turned them on (IncludedGames).
     public bool SkipCompetitive = true;
