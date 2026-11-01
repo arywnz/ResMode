@@ -11,6 +11,63 @@ using System.Windows.Forms;
 // launcher tabs and the cover grid. Settings and "Adicionar jogo" open as modals.
 public class Dashboard : Form {
     [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr h, int attribute, ref int value, int size);
+    [DllImport("dwmapi.dll")] static extern int DwmSetIconicThumbnail(IntPtr h, IntPtr bitmap, int flags);
+    [DllImport("dwmapi.dll")] static extern int DwmSetIconicLivePreviewBitmap(IntPtr h, IntPtr bitmap, IntPtr clientOffset, int flags);
+    [DllImport("dwmapi.dll")] static extern int DwmInvalidateIconicBitmaps(IntPtr h);
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr handle);
+
+    // What the taskbar shows when the pointer rests on the button. Without this a minimized custom-painted window gets a
+    // grey placeholder, so the window is photographed when it is minimized and that picture is handed to Windows on request.
+    Bitmap lastShot;
+
+    Bitmap Photograph() {
+        var b = new Bitmap(Math.Max(1, ClientSize.Width), Math.Max(1, ClientSize.Height));
+        foreach (Control c in Controls)
+            if (c.Visible) c.DrawToBitmap(b, c.Bounds);
+        return b;
+    }
+
+    void Remember() {
+        try {
+            var shot = Photograph();
+            if (lastShot != null) lastShot.Dispose();
+            lastShot = shot;
+        } catch { }
+    }
+
+    // maxWidth/maxHeight are the thumbnail's limits; 0 means the full picture (live preview).
+    void SendPicture(bool live, int maxWidth, int maxHeight) {
+        try {
+            if (WindowState != FormWindowState.Minimized && Visible) Remember();
+            if (lastShot == null) return;
+            Bitmap bmp = lastShot;
+            bool scaled = false;
+            if (!live && maxWidth > 0 && maxHeight > 0) {
+                double ratio = Math.Min(maxWidth / (double)lastShot.Width, maxHeight / (double)lastShot.Height);
+                bmp = new Bitmap(Math.Max(1, (int)(lastShot.Width * ratio)), Math.Max(1, (int)(lastShot.Height * ratio)), System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                scaled = true;
+                using (var g = Graphics.FromImage(bmp)) {
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                    g.DrawImage(lastShot, 0, 0, bmp.Width, bmp.Height);
+                }
+            } else if (bmp.PixelFormat != System.Drawing.Imaging.PixelFormat.Format32bppArgb) {
+                bmp = new Bitmap(lastShot.Width, lastShot.Height, System.Drawing.Imaging.PixelFormat.Format32bppArgb);
+                scaled = true;
+                using (var g = Graphics.FromImage(bmp)) g.DrawImageUnscaled(lastShot, 0, 0);
+            }
+            IntPtr hbitmap = bmp.GetHbitmap(Color.Black);
+            try { if (live) DwmSetIconicLivePreviewBitmap(Handle, hbitmap, IntPtr.Zero, 0); else DwmSetIconicThumbnail(Handle, hbitmap, 0); }
+            finally { DeleteObject(hbitmap); if (scaled) bmp.Dispose(); }
+        } catch { }
+    }
+
+    protected override void WndProc(ref Message m) {
+        if (m.Msg == 0x112 && ((int)m.WParam.ToInt64() & 0xFFF0) == 0xF020) { Remember(); DwmInvalidateIconicBitmaps(Handle); } // SC_MINIMIZE: keep how it looked
+        else if (m.Msg == 0x323) { long p = m.LParam.ToInt64(); SendPicture(false, (int)((p >> 16) & 0xFFFF), (int)(p & 0xFFFF)); return; } // WM_DWMSENDICONICTHUMBNAIL
+        else if (m.Msg == 0x326) { SendPicture(true, 0, 0); return; } // WM_DWMSENDICONICLIVEPREVIEWBITMAP
+        base.WndProc(ref m);
+    }
+
 
     readonly AppContext owner;
     readonly Panel topBar, tabsRow;
@@ -114,6 +171,8 @@ public class Dashboard : Form {
             DwmSetWindowAttribute(Handle, 33, ref round, 4);    // rounded window corners
             DwmSetWindowAttribute(Handle, 35, ref caption, 4);  // title bar color matches the window
             DwmSetWindowAttribute(Handle, 36, ref text, 4);
+            int yes = 1;
+            DwmSetWindowAttribute(Handle, 10, ref yes, 4);      // DWMWA_HAS_ICONIC_BITMAP: Windows asks this window for its taskbar preview
         } catch { }
     }
 
@@ -307,6 +366,7 @@ public class Dashboard : Form {
     protected override void Dispose(bool disposing) {
         if (disposing) {
             if (refresh != null) refresh.Dispose();
+            if (lastShot != null) { lastShot.Dispose(); lastShot = null; }
             Artwork.Clear();
         }
         base.Dispose(disposing);

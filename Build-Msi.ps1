@@ -15,7 +15,7 @@ try{
         if($LASTEXITCODE -ne 0){throw 'WiX extension installation failed.'}
     }
     New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
-    $output=Join-Path $OutputDirectory 'ResMode-0.2.2-alpha.12-win-x64.msi'
+    $output=Join-Path $OutputDirectory 'ResMode-0.2.2-alpha.13-win-x64.msi'
     & $wix build (Join-Path $PSScriptRoot 'installer\ResMode.wxs') -arch x64 -culture pt-BR `
         -ext WixToolset.UI.wixext -ext WixToolset.Netfx.wixext `
         -d "BinaryDir=$([IO.Path]::GetFullPath($BinaryDirectory))" -d "SourceDir=$PSScriptRoot" -out $output
