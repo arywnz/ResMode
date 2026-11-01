@@ -98,15 +98,14 @@ public static class Artwork {
 
     // Pick a representative cluster of real pixels, without inventing saturation or brightness.
     static Color Tint(Image image) {
-        using (var small = new Bitmap(8, 8)) {
-            using (var g = Graphics.FromImage(small)) {
-                g.InterpolationMode = InterpolationMode.HighQualityBilinear;
-                g.DrawImage(image, 0, 0, 8, 8);
-            }
+        var pixels=image as Bitmap;bool owns=pixels==null;
+        if(owns)pixels=new Bitmap(image);
+        try {
             var buckets = new Dictionary<int,List<Color>>();
             for (int x = 0; x < 8; x++)
                 for (int y = 0; y < 8; y++) {
-                    var c = small.GetPixel(x, y);
+                    // Sample the original pixels: resizing can change even a solid cover's RGB values.
+                    var c = pixels.GetPixel(Math.Min(pixels.Width-1,(2*x+1)*pixels.Width/16),Math.Min(pixels.Height-1,(2*y+1)*pixels.Height/16));
                     if(c.A<128||c.GetBrightness()<.08f)continue;
                     int key=(c.R/32)<<6|(c.G/32)<<3|c.B/32;List<Color> group;
                     if(!buckets.TryGetValue(key,out group))buckets[key]=group=new List<Color>();group.Add(c);
@@ -114,7 +113,7 @@ public static class Artwork {
             if(buckets.Count==0)return Theme.Muted;
             var dominant=buckets.Values.OrderByDescending(group=>group.Count*(.5+group.Average(c=>c.GetSaturation()))).First();
             return Color.FromArgb((int)dominant.Average(c=>c.R),(int)dominant.Average(c=>c.G),(int)dominant.Average(c=>c.B));
-        }
+        } finally {if(owns)pixels.Dispose();}
     }
 
     static Image Fit(string file, Size size) {
