@@ -140,6 +140,9 @@ public static class Artwork {
     // A crisp outer frame around the image only. Labels and cover pixels are not tinted.
     public static void DrawCoverFrame(Graphics g,Rectangle cover,Color tint,float amount){
         amount=Math.Max(0,Math.Min(1,amount));if(amount<=0)return;
+        // Keep dark covers' hue/channel ratios while making their thin frame readable on black.
+        int peak=Math.Max(tint.R,Math.Max(tint.G,tint.B));
+        if(peak>0&&peak<112)tint=Color.FromArgb(tint.R*112/peak,tint.G*112/peak,tint.B*112/peak);
         var frame=Rectangle.Inflate(cover,Theme.S(4),Theme.S(4));
         using(var path=Theme.Round(frame,Radius+Theme.S(4)))
         using(var fill=new SolidBrush(Color.FromArgb((int)(230*amount),tint)))
