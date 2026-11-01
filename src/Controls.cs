@@ -507,7 +507,7 @@ public class GameGrid : ScrollSurface {
     public static Size Cover { get { return new Size(Theme.S(148), Theme.S(222)); } }
     int Gap { get { return Theme.S(18); } }
     int CardH { get { return Cover.Height + Theme.S(54); } }
-    // Room around the grid for the bounded card background.
+    // Room around the grid for the cover's outer frame.
     int Edge { get { return Theme.S(12); } }
     int Columns { get { return Math.Max(1, (Width - Theme.S(10) - Edge + Gap) / (Cover.Width + Gap)); } }
 
@@ -679,8 +679,8 @@ public class GameGrid : ScrollSurface {
     readonly Dictionary<string, Bitmap> labels = new Dictionary<string, Bitmap>();
 
     // Name plus launcher line, rendered once per game into a transparent bitmap.
-    Bitmap Label(LibraryGame game, bool highlighted=false) {
-        string key = game.Key + "|" + game.Excluded + "|" + game.Competitive + "|" + Cover.Width+"|"+highlighted;
+    Bitmap Label(LibraryGame game) {
+        string key = game.Key + "|" + game.Excluded + "|" + game.Competitive + "|" + Cover.Width;
         Bitmap bmp;
         if (labels.TryGetValue(key, out bmp)) return bmp;
         bmp = new Bitmap(Cover.Width, Theme.S(46), System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
@@ -688,11 +688,11 @@ public class GameGrid : ScrollSurface {
         using (var format = new StringFormat(StringFormatFlags.NoWrap) { Trimming = StringTrimming.EllipsisCharacter, LineAlignment = StringAlignment.Center }) {
             g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            using (var b = new SolidBrush(game.Excluded&&!highlighted ? Theme.Muted : Theme.Text)) g.DrawString(game.Name, nameFont, b, new RectangleF(-Theme.S(1), 0, bmp.Width + Theme.S(1), Theme.S(22)), format);
+            using (var b = new SolidBrush(game.Excluded ? Theme.Muted : Theme.Text)) g.DrawString(game.Name, nameFont, b, new RectangleF(-Theme.S(1), 0, bmp.Width + Theme.S(1), Theme.S(22)), format);
             float lx = 0;
             var icon = game.Launcher.Icon;
             if (icon != null) { g.DrawImage(icon, 0, Theme.S(26), Theme.S(14), Theme.S(14)); lx = Theme.S(20); }
-            using (var b = new SolidBrush(highlighted?Theme.Text:Theme.Muted)) g.DrawString(game.Excluded && game.Competitive ? "Competitivo" : game.Launcher.Name, small, b, new RectangleF(lx - Theme.S(1), Theme.S(24), bmp.Width - lx, Theme.S(18)), format);
+            using (var b = new SolidBrush(Theme.Muted)) g.DrawString(game.Excluded && game.Competitive ? "Competitivo" : game.Launcher.Name, small, b, new RectangleF(lx - Theme.S(1), Theme.S(24), bmp.Width - lx, Theme.S(18)), format);
         }
         if (labels.Count > 400) { foreach (var old in labels.Values) old.Dispose(); labels.Clear(); }
         labels[key] = bmp;
@@ -769,7 +769,7 @@ public class GameGrid : ScrollSurface {
             g.InterpolationMode = InterpolationMode.NearestNeighbor;
             g.PixelOffsetMode = PixelOffsetMode.Half;
             var r = new Rectangle(margin, margin, Cover.Width, Cover.Height);
-            Artwork.DrawCardBackground(g,new Rectangle(margin,margin,Cover.Width,CardH),art.Tint,hover);
+            Artwork.DrawCoverFrame(g,r,art.Tint,hover);
             g.DrawImageUnscaled(art.Cover, r.Location);
             using (var path = Theme.Round(r, Artwork.Radius)) {
                 if (game.Excluded) using (var shade = new SolidBrush(Color.FromArgb(170, Theme.Base))) g.FillPath(shade, path);
@@ -780,7 +780,7 @@ public class GameGrid : ScrollSurface {
                 var target = new Rectangle(margin + (Cover.Width - Theme.S(56)) / 2 - pad, margin + (Cover.Height - Theme.S(56)) / 2 - pad, play.Width, play.Height);
                 using (var alpha = Faded(hover)) g.DrawImage(play, target, 0, 0, play.Width, play.Height, GraphicsUnit.Pixel, alpha);
             }
-            g.DrawImageUnscaled(Label(game,hover>.01f), margin, margin + Cover.Height + Theme.S(8));
+            g.DrawImageUnscaled(Label(game), margin, margin + Cover.Height + Theme.S(8));
         }
         while (hoverTiles.Count >= 192) { string oldest = hoverTileOrder.Dequeue(); hoverTiles[oldest].Dispose(); hoverTiles.Remove(oldest); }
         hoverTiles.Add(key, tile);hoverTileOrder.Enqueue(key);
@@ -842,7 +842,7 @@ public class GameGrid : ScrollSurface {
                 var beforeLift = g.Save();
                 var coverRect = Rectangle.Inflate(new Rectangle(card.X, card.Y, Cover.Width, Cover.Height), -(int)(Theme.S(4) * depth), -(int)(Theme.S(6) * depth));
 
-                if(art!=null)Artwork.DrawCardBackground(g,card,art.Tint,hov);
+                if(art!=null)Artwork.DrawCoverFrame(g,coverRect,art.Tint,hov);
 
                 using (var path = Theme.Round(coverRect, Artwork.Radius)) {
                     // Art fades in when it finishes loading instead of popping in.
@@ -898,7 +898,7 @@ public class GameGrid : ScrollSurface {
 
                 // Name and launcher come from a cached transparent bitmap: drawing text costs ~0.6 ms a line,
                 // which over every card was most of the frame time while hovering.
-                var labelImage = Label(game,hov>.01f);
+                var labelImage = Label(game);
                 g.InterpolationMode = fractional ? InterpolationMode.Bilinear : InterpolationMode.NearestNeighbor;
                 g.PixelOffsetMode = PixelOffsetMode.Half;
                 g.DrawImage(labelImage, card.X, coverRect.Bottom + Theme.S(8), labelImage.Width, labelImage.Height);

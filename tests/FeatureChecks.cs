@@ -44,11 +44,19 @@ public static class FeatureChecks {
                 var tile=(Bitmap)typeof(GameGrid).GetMethod("HoverTile",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(grid,new object[]{game,art,1f,false});
                 int m=Artwork.CardMargin;
                 foreach(var at in new[]{new Point(12,12),new Point(13,12),new Point(size.Width-14,size.Height-14)})Check(tile.GetPixel(m+at.X,m+at.Y).ToArgb()==cover.GetPixel(at.X,at.Y).ToArgb(),"Hover changed sharp cover pixels.");
-                var backdrop=tile.GetPixel(m-4,m+size.Height+25);Check(backdrop.A>=90&&backdrop.R>220&&backdrop.G==0&&backdrop.B==0,"Card background is missing, weak or unrelated to cover colour.");
+                var frame=tile.GetPixel(m-2,m+size.Height/2);Check(frame.A>=200&&frame.R>220&&frame.G==0&&frame.B==0,"Cover frame is missing or unrelated to the cover colour.");
+                Check(tile.GetPixel(m-2,m+size.Height+12).A==0,"Cover colour leaked into the name/platform area.");
                 Check(tile.GetPixel(0,0).A==0,"Blur spilled outside the bounded card background.");
             }
         }
-        results.Add("PASS: visible cover-colour background behind the card, unchanged sharp cover pixels and no blurred halo outside its bounds.");
+        using(var mostlyBlue=new Bitmap(160,240)){
+            using(var g=Graphics.FromImage(mostlyBlue)){
+                for(int y=0;y<24;y++)using(var brush=new SolidBrush(Color.FromArgb(24+y*2,30+y*2,45+y*2)))g.FillRectangle(brush,0,y*10,160,10);
+                g.FillRectangle(Brushes.Gold,0,0,160,40);
+            }
+            var tint=(Color)tintMethod.Invoke(null,new object[]{mostlyBlue});Check(tint.B>tint.R&&tint.B>tint.G,"A small gold title displaced the dominant blue cover tones.");
+        }
+        results.Add("PASS: crisp cover-only frame, unchanged cover pixels, no colour behind labels and dominant image tones preferred over a small bright title.");
         using(var grid=new Grid{Size=new Size(1120,650)}){
             var games=Enumerable.Range(0,5).Select(i=>new LibraryGame{Key="fixture:"+i,Name="Fixture "+i,Launcher=Launchers.Manual,Installed=true,Rules=new List<GameRule>()}).ToList();grid.SetGames(games,false);
             var first=Card(grid,0);var last=Card(grid,4);grid.Pointer(new Point(first.X+30,first.Y+30));grid.Pointer(new Point(last.X+30,last.Y+30));
