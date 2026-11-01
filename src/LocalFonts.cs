@@ -8,7 +8,8 @@ using System.Runtime.InteropServices;
 
 // Embedded, unmodified OFL fonts. Registration is private to this process, not a system install.
 public static class LocalFonts {
-    static readonly PrivateFontCollection collection = new PrivateFontCollection();
+    // Separate collections avoid GDI+ merging static weights with the same typographic family.
+    static readonly List<PrivateFontCollection> collections = new List<PrivateFontCollection>();
     static readonly List<IntPtr> memory = new List<IntPtr>();
     static readonly List<IntPtr> registrations = new List<IntPtr>();
     static readonly object gate = new object();
@@ -24,11 +25,12 @@ public static class LocalFonts {
                 using (var stream = assembly.GetManifestResourceStream(resource)) using (var bytes = new MemoryStream()) {
                     stream.CopyTo(bytes);byte[] data = bytes.ToArray();
                     IntPtr pointer = Marshal.AllocHGlobal(data.Length);Marshal.Copy(data,0,pointer,data.Length);memory.Add(pointer);
-                    collection.AddMemoryFont(pointer,data.Length);uint count=0;
+                    var face=new PrivateFontCollection();face.AddMemoryFont(pointer,data.Length);collections.Add(face);
+                    foreach(var family in face.Families)families[family.Name]=family;
+                    uint count=0;
                     IntPtr handle=AddFontMemResourceEx(pointer,(uint)data.Length,IntPtr.Zero,ref count);if(handle!=IntPtr.Zero)registrations.Add(handle);
                 }
             }
-            foreach(var family in collection.Families)families[family.Name]=family;
             ready = true;
         }
     }
