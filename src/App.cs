@@ -196,7 +196,7 @@ public class AppContext : ApplicationContext {
                             lastError = e.Message;
                         }
                     }
-                }
+                } else if (active) KeepGameMode();
             } else if (active && games.Count == 0) {
                 if (emptySince == DateTime.MinValue) emptySince = DateTime.Now;
                 if ((DateTime.Now - emptySince).TotalSeconds >= RestoreDelaySeconds) Restore();
@@ -502,6 +502,37 @@ public class AppContext : ApplicationContext {
             }
             if (changed) Store.SaveSettings(config);
         } catch (Exception e) { Store.Log("Erro ao ler o monitor: " + e.Message, LogKind.Error); }
+    }
+
+    // The game mode is temporary, so some games hand the desktop back when they lose focus (alt-tab, a click on the
+    // other monitor). While the game is still open and the screen has gone back to the desktop mode, put the game mode
+    // back. It waits a couple of seconds so it never fights the game's own mode change, and gives up after a few
+    // tries in a short time instead of looping.
+    DateTime revertedSince = DateTime.MinValue, modeWindow = DateTime.MinValue;
+    int modeRestores;
+    bool modeGaveUp;
+
+    void KeepGameMode() {
+        try {
+            var now = Native.Current(Device());
+            if (now.width != config.DesktopWidth || now.height != config.DesktopHeight || (now.width == config.Width && now.height == config.Height)) { revertedSince = DateTime.MinValue; return; }
+            if (revertedSince == DateTime.MinValue) { revertedSince = DateTime.Now; return; }
+            if ((DateTime.Now - revertedSince).TotalSeconds < 2) return;
+            if ((DateTime.Now - modeWindow).TotalMinutes > 2) { modeWindow = DateTime.Now; modeRestores = 0; modeGaveUp = false; }
+            if (modeRestores >= 5) {
+                if (!modeGaveUp) { modeGaveUp = true; Store.Log("O jogo desfez a resolução várias vezes seguidas; o app parou de reaplicar por alguns minutos.", LogKind.Error); }
+                return;
+            }
+            modeRestores++;
+            revertedSince = DateTime.MinValue;
+            string device = Device();
+            var target = Native.Find(device, config.Width, config.Height, now.hz);
+            if (Native.Set(device, target, true) != 0 || Native.Set(device, target, false) != 0) { Store.Log("Não deu para ligar a resolução de jogo de novo.", LogKind.Error); return; }
+            // The mode change moves windows on the other monitor again; put them back where they were before the game.
+            var saved = File.Exists(Store.State) ? Store.Read<Recovery>(Store.State).Windows : null;
+            if (saved != null) DesktopLayout.Settle(saved.Where(w => !String.Equals(w.Device, device, StringComparison.OrdinalIgnoreCase)).ToList());
+            Store.Log("O jogo devolveu a tela para " + config.DesktopWidth + " × " + config.DesktopHeight + "; resolução de jogo ligada de novo.", LogKind.Game);
+        } catch (Exception e) { Store.Log("Erro ao manter a resolução do jogo: " + e.Message, LogKind.Error); }
     }
 
     void Apply() {
