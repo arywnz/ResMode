@@ -30,10 +30,11 @@ This is a prepared application, not a claim of acceptance. Apply at https://sign
 
 ## Prerequisites before submission
 
-- [ ] Public repository is accessible at the URL above and the MIT/OFL license files are visible.
-- [ ] The GitHub-hosted build and regression workflow is green for the release commit.
-- [ ] An unsigned prerelease with a downloadable binary ZIP and checksums is published; use its exact release and CI URLs in the form.
-- [ ] Maintainer confirms MFA is enabled on GitHub and SignPath.
+- [x] Public repository is accessible at the URL above and the MIT/OFL license files are visible.
+- [x] The GitHub-hosted build and regression workflow is green for the release commit: https://github.com/arywnz/ResMode/actions/runs/41258818787.
+- [x] Unsigned prerelease with a downloadable binary ZIP and checksums: https://github.com/arywnz/ResMode/releases/tag/v0.1.0-alpha.1.
+- [x] Maintainer confirmed GitHub MFA is enabled on 2026-10-31.
+- [ ] Maintainer confirms MFA is enabled on SignPath after account setup.
 - [ ] Maintainer checks all Foundation terms and confirms project ownership and contact details.
 - [ ] Application submitted by maintainer. Do not claim approval while awaiting the decision.
 
