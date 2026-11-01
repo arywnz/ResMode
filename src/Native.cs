@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.8";
+    public const string Release = "0.2.2-alpha.9";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -135,9 +135,13 @@ public static class Native {
     }
 
     public static int Set(string device, Mode mode, bool test) {
-        mode.fields = 0x40000 | 0x80000 | 0x100000 | 0x400000; // bits, width, height, frequency; no registry persistence
+        mode.fields = 0x40000 | 0x80000 | 0x100000 | 0x400000; // bits, width, height, frequency
         mode.extra = 0;
-        return ChangeDisplaySettingsEx(device, ref mode, IntPtr.Zero, test ? 2 : 4, IntPtr.Zero);
+        // CDS_UPDATEREGISTRY, not the temporary CDS_FULLSCREEN: a temporary mode is undone as soon as any program (a game
+        // losing focus on Alt+Tab, say) calls ChangeDisplaySettings(NULL), which sends the desktop back to 1080p mid-game.
+        // The desktop mode is written back the same way when the game closes (Store.Restore), and again at the next start
+        // if the PC went down in between (restauracao.xml).
+        return ChangeDisplaySettingsEx(device, ref mode, IntPtr.Zero, test ? 2 : 1, IntPtr.Zero);
     }
 
     // Processes -----------------------------------------------------------
