@@ -51,7 +51,7 @@ public class SettingsOverlay : Modal {
         startup.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetStartup(startup.Checked)); };
         taskbar = new ToggleSwitch();
         taskbar.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetTaskbarRecovery(taskbar.Checked)); };
-        var fixNow = new FlatButton { Text = "Corrigir agora", Kind = ButtonKind.Quiet, Font = Theme.Body(10) };
+        var fixNow = new FlatButton { Text = "Corrigir agora" };
         fixNow.Width = fixNow.PreferredWidth();
         fixNow.Click += delegate { Act(() => owner.RequestTaskbarRefresh()); };
 

@@ -718,7 +718,8 @@ public class GameGrid : ScrollSurface {
         bmp = new Bitmap(Cover.Width, Theme.S(46), System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
         using (var g = Graphics.FromImage(bmp)) using (var nameFont = Theme.Body(10.5f, true)) using (var small = Theme.Body(9.5f))
         using (var format = new StringFormat(StringFormatFlags.NoWrap) { Trimming = StringTrimming.EllipsisCharacter, LineAlignment = StringAlignment.Center }) {
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+            // No grid fitting: it snaps Geist's curves to whole pixels, which reads as pixelated at these sizes.
+            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
             g.InterpolationMode = InterpolationMode.HighQualityBicubic;
             using (var b = new SolidBrush(game.Excluded ? Theme.Muted : Theme.Text)) g.DrawString(game.Name, nameFont, b, new RectangleF(-Theme.S(1), 0, bmp.Width + Theme.S(1), Theme.S(22)), format);
             float lx = 0;

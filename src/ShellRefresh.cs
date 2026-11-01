@@ -34,6 +34,9 @@ public static class ShellRefresh {
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr window,out DesktopLayout.Rect rect);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr window,StringBuilder value,int length);
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr window,int attribute,out int value,int size);
+    // Suspended Store apps keep an invisible frame window; DWM marks it cloaked and the person never sees it.
+    static bool Cloaked(IntPtr window){int value;return DwmGetWindowAttribute(window,14,out value,4)==0&&value!=0;}
     [DllImport("user32.dll")] static extern bool GetWindowPlacement(IntPtr window,ref DesktopLayout.Placement placement);
     [DllImport("user32.dll")] static extern bool SetWindowPlacement(IntPtr window,ref DesktopLayout.Placement placement);
     public class Folder {public string Path;public long Handle;public DesktopLayout.Placement Placement;}
@@ -105,7 +108,7 @@ public static class ShellRefresh {
         var blockers=new List<string>();
         var explorerPids=new HashSet<uint>();explorerPids.Add(id);
         foreach(var p in Process.GetProcessesByName("explorer")){using(p){explorerPids.Add((uint)p.Id);}}
-        EnumWindows(delegate(IntPtr window,IntPtr data){uint pid;GetWindowThreadProcessId(window,out pid);if(!explorerPids.Contains(pid)||!IsWindowVisible(window))return true;
+        EnumWindows(delegate(IntPtr window,IntPtr data){uint pid;GetWindowThreadProcessId(window,out pid);if(!explorerPids.Contains(pid)||!IsWindowVisible(window)||Cloaked(window))return true;
             var name=new StringBuilder(256);GetClassName(window,name,name.Capacity);string cls=name.ToString();
             DesktopLayout.Rect rect;GetWindowRect(window,out rect);if(Ignorable(cls,rect.Width,rect.Height))return true;
             if(cls=="CabinetWClass"&&folders.Exists(f=>f.Handle==window.ToInt64()))return true;
