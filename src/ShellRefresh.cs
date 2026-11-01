@@ -125,12 +125,14 @@ public static class ShellRefresh {
                 if(!String.Equals(Native.Exe(shell),expected,StringComparison.OrdinalIgnoreCase)){Defer("a barra de tarefas não é a do Windows.");return false;}
                 // Check again immediately before acting, and preserve other monitors across the shell restart.
                 var windows=DesktopLayout.Capture(gameDisplay,true,DesktopLayout.GamePids(Store.LoadSettings().Games));folders=Folders();if(HasExplorerWindows(id,folders))return false;
-                string recovery=RecoveryFile;Store.Write(recovery,folders);
+                string recovery=RecoveryFile;
                 string eventName="Local\\ResMode.ShellGuard."+Guid.NewGuid().ToString("N");
                 using(var armed=new EventWaitHandle(false,EventResetMode.ManualReset,eventName))
                 using(var guard=Process.Start(new ProcessStartInfo(System.Windows.Forms.Application.ExecutablePath,"/shellguard "+id+" "+eventName){UseShellExecute=false,CreateNoWindow=true})){
                     if(!armed.WaitOne(4000)){Store.Log("A recuperação independente não iniciou; o Explorer foi preservado.",LogKind.Error);return false;}
                     if(File.Exists(Store.State)||DesktopLayout.GamePids(Store.LoadSettings().Games).Count>0){Defer("um jogo acabou de abrir.");return false;}
+                    Store.Write(recovery,folders);
+                    if(guard.HasExited){File.Delete(recovery);Store.Log("A proteção de recuperação encerrou antes da ação; o Explorer foi preservado.",LogKind.Error);return false;}
                     shell.Kill();shell.WaitForExit(2000);
                     if(!WaitReady(25000)||ShellPid()==id){Store.Log("A área de trabalho e a barra ainda não confirmaram a volta; recuperação pendente.",LogKind.Error);return false;}
                 }
