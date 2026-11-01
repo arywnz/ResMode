@@ -1,40 +1,32 @@
 using System;
 using System.Collections.Generic;
 using System.Drawing;
-using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
-// Settings modal: "Geral" (switching, display, games, system) and "Histórico" (the log, filtered and coloured).
+// Settings modal: one page with the master switch on top, then Tela, Jogos and Sistema.
 public class SettingsOverlay : Modal {
     readonly AppContext owner;
     readonly Label title;
-    readonly FlatButton closeButton, quitButton, clearButton, openButton;
-    readonly Segments tabs, logFilter;
+    readonly FlatButton closeButton, quitButton;
     readonly SmoothScroll general;
-    readonly Panel history, generalColumn;
+    readonly Panel generalColumn;
     readonly SelectBox monitors, resolutions, logLevel;
-    readonly ToggleSwitch switching, competitive, startup, taskbar;
-    readonly Label resolutionHelp, switchingHelp;
-    readonly LogView log;
+    readonly ToggleSwitch switching, competitive, startup, taskbar, autoUpdate;
+    readonly Label resolutionHelp, updateInfo;
+    readonly FlatButton updateButton;
     readonly System.Windows.Forms.Timer refresh;
-    List<LogView.Entry> entries = new List<LogView.Entry>();
-    string logStamp;
     bool syncing;
 
     public SettingsOverlay(AppContext context, Func<Bitmap> windowSnapshot) : base(windowSnapshot) {
         owner = context;
-        MaxCard = new Size(Theme.S(760), Theme.S(700));
+        MaxCard = new Size(Theme.S(760), Theme.S(780));
 
         title = CardLabel("Configurações", Theme.Title(18), Theme.Text);
         title.AutoSize = true;
         closeButton = new FlatButton { Glyph = Theme.IconClose, Kind = ButtonKind.Quiet, Width = Theme.S(36) };
         closeButton.Click += delegate { Close(); };
-        tabs = new Segments { BackColor = Theme.Surface, Tabs = new List<Segments.Tab> { new Segments.Tab { Label = "Geral", Count = -1 }, new Segments.Tab { Label = "Histórico", Count = -1 } } };
-        tabs.Width = tabs.PreferredWidth();
-        tabs.Changed += delegate { ShowTab(); };
 
-        // Geral ----------------------------------------------------------------
         general = new SmoothScroll { BackColor = Theme.Surface };
         generalColumn = general.Content;
         generalColumn.BackColor = Theme.Surface;
@@ -43,7 +35,7 @@ public class SettingsOverlay : Modal {
         switching.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetPaused(!switching.Checked)); };
         monitors = new SelectBox { Width = Theme.S(210) };
         monitors.SelectionCommitted += delegate { Act(() => { owner.ChangeDisplay(((DisplayChoice)monitors.SelectedItem).Device); ReloadResolutions(); }); };
-        resolutions = new SelectBox { Width = Theme.S(210), Technical=true, Font=Theme.Mono(10.5f) };
+        resolutions = new SelectBox { Width = Theme.S(210), Technical = true, Font = Theme.Mono(10.5f) };
         resolutions.SelectionCommitted += delegate {
             var r = (ResolutionChoice)resolutions.SelectedItem;
             Act(() => owner.ChangeResolution(r.Width, r.Height));
@@ -53,7 +45,6 @@ public class SettingsOverlay : Modal {
         new ToolTip().SetToolTip(reload, "Atualizar a lista");
         resolutionHelp = new Label { Cursor = Cursors.Hand };
         resolutionHelp.Click += delegate { ShowResolutionHelp(); };
-        switchingHelp = new Label();
         competitive = new ToggleSwitch();
         competitive.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetSkipCompetitive(competitive.Checked)); };
         startup = new ToggleSwitch();
@@ -64,8 +55,25 @@ public class SettingsOverlay : Modal {
         fixNow.Width = fixNow.PreferredWidth();
         fixNow.Click += delegate { Act(() => owner.RequestTaskbarRefresh()); };
 
+        // What gets saved, and the button that turns it into a .txt the person can send.
+        logLevel = new SelectBox { Width = Theme.S(170) };
+        logLevel.Items = new List<object> { new LevelChoice("all", "Salvar tudo"), new LevelChoice("games", "Só os jogos"), new LevelChoice("off", "Não salvar") };
+        logLevel.SelectionCommitted += delegate { Act(() => owner.SetLogLevel(((LevelChoice)logLevel.SelectedItem).Value)); };
+        var exportLog = new FlatButton { Text = "Gerar log", Glyph = Theme.IconFolder };
+        exportLog.Width = exportLog.PreferredWidth();
+        exportLog.Click += delegate { Act(() => owner.ExportLog()); };
+
+        // One button does the whole job: look for an update, and once one is found, install it.
+        updateInfo = new Label();
+        new ToolTip().SetToolTip(updateInfo, "Mostra a versão instalada e o resultado da última busca.");
+        updateButton = new FlatButton { Width = Theme.S(132), Kind = ButtonKind.Secondary };
+        updateButton.Click += delegate { Act(() => { if (owner.Update != null) owner.InstallUpdate(); else owner.CheckForUpdates(true); }); };
+        autoUpdate = new ToggleSwitch();
+        new ToolTip().SetToolTip(autoUpdate, "Procurar sozinho ao abrir e a cada 12 horas. Não envia nada seu.");
+        autoUpdate.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetCheckUpdates(autoUpdate.Checked)); };
+
         var blocks = new List<Control> {
-            Hero(),
+            Row("Trocar resolução nos jogos", null, null, switching, true),
             Group("Tela",
                 Row("Monitor", null, null, monitors),
                 Row("Resolução nos jogos", null, resolutionHelp, Pair(reload, resolutions))),
@@ -73,7 +81,9 @@ public class SettingsOverlay : Modal {
                 Row("Ignorar competitivos", "Ficam na resolução nativa, onde FPS e latência pesam mais que nitidez.", null, competitive)),
             Group("Sistema",
                 Row("Iniciar com o Windows", "Abre minimizado na bandeja.", null, startup),
-                Row("Corrigir ícones borrados", "Reinicia a barra de tarefas depois de jogar.", null, Pair(fixNow, taskbar)))
+                Row("Corrigir ícones borrados", "Reinicia a barra de tarefas depois de jogar.", null, Pair(fixNow, taskbar)),
+                Row("Registro de atividade", "Erros ficam sempre salvos.", null, Pair(logLevel, exportLog)),
+                Row("Procurar atualizações", null, updateInfo, Pair(updateButton, autoUpdate)))
         };
         foreach (var b in blocks) generalColumn.Controls.Add(b);
         foreach (var b in blocks) b.SizeChanged += delegate { Restack(); };
@@ -83,40 +93,11 @@ public class SettingsOverlay : Modal {
             Restack();
         };
 
-        // Histórico ------------------------------------------------------------
-        history = new Panel { BackColor = Theme.Surface, Visible = false };
-        logFilter = new Segments { BackColor = Theme.Surface };
-        logFilter.Changed += delegate { ShowLog(); };
-        logLevel = new SelectBox { Width = Theme.S(200) };
-        logLevel.Items = new List<object> { new LevelChoice("all", "Salvar tudo"), new LevelChoice("games", "Salvar só os jogos"), new LevelChoice("off", "Não salvar") };
-        logLevel.SelectionCommitted += delegate { Act(() => owner.SetLogLevel(((LevelChoice)logLevel.SelectedItem).Value)); };
-        new ToolTip().SetToolTip(logLevel, "Erros são sempre salvos.");
-        log = new LogView { BackColor = Theme.Surface };
-        history.Controls.AddRange(new Control[] { logFilter, logLevel, log });
-        history.Layout += delegate {
-            bool wrap = history.Width - logFilter.Width - Theme.S(24) < Theme.S(170);
-            logFilter.Location = new Point(0, 0);
-            logLevel.Location = wrap ? new Point(0, logFilter.Bottom + Theme.S(10)) : new Point(history.Width - logLevel.Width, 0);
-            int top = (wrap ? logLevel.Bottom : logFilter.Bottom) + Theme.S(14);
-            log.SetBounds(0, top, history.Width, history.Height - top);
-        };
-
-        // Footer -----------------------------------------------------------------
         quitButton = new FlatButton { Text = "Sair do " + AppInfo.Name, Kind = ButtonKind.Quiet, Ink = Theme.Danger };
         quitButton.Width = quitButton.PreferredWidth();
         quitButton.Click += delegate { Act(() => owner.Quit()); };
-        clearButton = new FlatButton { Text = "Limpar histórico", Kind = ButtonKind.Quiet, Visible = false };
-        clearButton.Width = clearButton.PreferredWidth();
-        clearButton.Click += delegate {
-            if (MessageBox.Show(FindForm(), "Apagar todo o histórico?", AppInfo.Name, MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
-            Act(() => owner.ClearLog());
-            logStamp = null;
-        };
-        openButton = new FlatButton { Text = "Abrir arquivo", Visible = false };
-        openButton.Width = openButton.PreferredWidth();
-        openButton.Click += delegate { Act(() => owner.OpenLog()); };
 
-        Controls.AddRange(new Control[] { title, closeButton, tabs, general, history, quitButton, clearButton, openButton });
+        Controls.AddRange(new Control[] { title, closeButton, general, quitButton });
 
         refresh = new System.Windows.Forms.Timer { Interval = 1000 };
         refresh.Tick += delegate { Sync(); };
@@ -129,24 +110,9 @@ public class SettingsOverlay : Modal {
         int pad = Theme.S(30), x = card.X + pad, right = card.Right - pad, w = right - x;
         title.Location = new Point(x - Theme.S(2), card.Y + Theme.S(24));
         closeButton.Location = new Point(card.Right - Theme.S(18) - closeButton.Width, card.Y + Theme.S(18));
-        tabs.Location = new Point(x, card.Y + Theme.S(72));
-        int bodyTop = tabs.Bottom + Theme.S(18), footer = card.Bottom - Theme.S(20) - Theme.S(36);
+        int bodyTop = card.Y + Theme.S(76), footer = card.Bottom - Theme.S(20) - Theme.S(36);
         general.SetBounds(x, bodyTop, w + Theme.S(10), footer - Theme.S(14) - bodyTop);
-        history.SetBounds(x, bodyTop, w, footer - Theme.S(14) - bodyTop);
         quitButton.Location = new Point(x - Theme.S(10), footer);
-        openButton.Location = new Point(right - openButton.Width, footer);
-        clearButton.Location = new Point(openButton.Left - Theme.S(8) - clearButton.Width, footer);
-    }
-
-
-    // The base class reveals every control when the card finishes opening; keep only the current tab's.
-    protected override void OnShown() { ShowTab(); }
-
-    void ShowTab() {
-        bool logs = tabs.Index == 1;
-        general.Visible = !logs;
-        history.Visible = clearButton.Visible = openButton.Visible = logs;
-        if (logs) { logStamp = null; Sync(); }
     }
 
     void Restack() {
@@ -172,7 +138,8 @@ public class SettingsOverlay : Modal {
                 if (r.Left != x || r.Top != y || r.Width != group.Width - x) r.SetBounds(x, y, group.Width - x, r.Height);
                 y += r.Height;
             }
-            // Beside the rows, the name lines up with the first option's title.
+            // Beside the rows, the name lines up with the first option's title (laid out first, so its position is current).
+            rows[0].PerformLayout();
             var first = rows[0].Controls[0];
             label.Location = side ? new Point(0, rows[0].Top + first.Top + (first.Height - label.Height) / 2) : new Point(0, Theme.S(18));
             int height = y + Theme.S(14);
@@ -192,27 +159,17 @@ public class SettingsOverlay : Modal {
     }
 
     // Label and description on the left, control on the right; on narrow cards the control drops below.
-    // The master switch: larger title, and a coloured dot that says at a glance whether it is on.
-    Control Hero() {
-        var row = (Panel)Row("Trocar resolução nos jogos", null, switchingHelp, switching, true);
-        row.Paint += (s, e) => {
-            Theme.Smooth(e.Graphics);
-            int d = Theme.S(8), y = switchingHelp.Top + (switchingHelp.Height - d) / 2;
-            using (var b = new SolidBrush(owner.Paused ? Theme.Warn : Theme.Live)) e.Graphics.FillEllipse(b, 0, y, d, d);
-        };
-        return row;
-    }
-
+    // The hero row (the master switch) has a larger title and no description.
     Control Row(string name, string description, Label descriptionLabel, Control control, bool hero = false) {
-        int baseHeight = hero ? Theme.S(84) : Theme.S(62), descTop = hero ? Theme.S(48) : Theme.S(35), indent = hero ? Theme.S(16) : 0;
+        int baseHeight = hero ? Theme.S(72) : Theme.S(62), descTop = Theme.S(35);
         var row = new Panel { Height = baseHeight, BackColor = Theme.Surface };
-        var label = new Label { Text = name, Font = hero ? Theme.Body(13, true) : Theme.Body(11, true), ForeColor = Theme.Text, AutoSize = true, BackColor = Theme.Surface, Location = new Point(0, hero ? Theme.S(16) : Theme.S(11)) };
+        var label = new Label { Text = name, Font = hero ? Theme.Body(13, true) : Theme.Body(11, true), ForeColor = Theme.Text, AutoSize = true, BackColor = Theme.Surface, Location = new Point(0, Theme.S(11)) };
         var desc = descriptionLabel ?? new Label { Text = description };
         desc.Font = Theme.Body(10);
         desc.ForeColor = Theme.Muted;
         desc.BackColor = Theme.Surface;
         desc.AutoEllipsis = true;
-        desc.Location = new Point(indent, descTop);
+        desc.Location = new Point(0, descTop);
         bool described = descriptionLabel != null || description != null;
         row.Controls.Add(label);
         if (described) row.Controls.Add(desc);
@@ -224,10 +181,10 @@ public class SettingsOverlay : Modal {
             if (row.Height != height) { row.Height = height; return; }
             if (narrow) {
                 control.Location = new Point(0, baseHeight);
-                desc.Size = new Size(row.Width - indent, Theme.S(22));
+                desc.Size = new Size(row.Width, Theme.S(22));
             } else {
                 control.Location = new Point(row.Width - control.Width, (row.Height - control.Height) / 2);
-                desc.Size = new Size(Math.Max(Theme.S(100), control.Left - Theme.S(20) - indent), Theme.S(22));
+                desc.Size = new Size(Math.Max(Theme.S(100), control.Left - Theme.S(20)), Theme.S(22));
             }
             row.Invalidate();
         };
@@ -243,21 +200,10 @@ public class SettingsOverlay : Modal {
         public override int GetHashCode() { return Device.GetHashCode(); }
     }
 
-    class ResolutionChoice : IListItem {
-        public int Width, Height, MaxHz;
-        public double Factor;
-        public string Label { get { return Width + " × " + Height; } }
-        // Factor over the desktop's pixels, then the best refresh rate the driver offers at that size.
-        public string Detail {
-            get {
-                string factor = Factor.ToString("0.##") + "×";
-                return factor + (MaxHz > 0 ? "    " + MaxHz + " Hz" : "");
-            }
-        }
-        public override string ToString() {
-            string tag = Width == 3840 && Height == 2160 ? "4K" : Width == 2560 && Height == 1440 ? "QHD" : Width == 5120 && Height == 2880 ? "5K" : Factor.ToString("0.##") + "×";
-            return Width + " × " + Height + "  (" + tag + ")";
-        }
+    // The list shows only the resolution; the factor and refresh rate are in the explanation card.
+    class ResolutionChoice {
+        public int Width, Height;
+        public override string ToString() { return Width + " × " + Height; }
         public override bool Equals(object o) { var r = o as ResolutionChoice; return r != null && r.Width == Width && r.Height == Height; }
         public override int GetHashCode() { return Width * 10000 + Height; }
     }
@@ -284,18 +230,17 @@ public class SettingsOverlay : Modal {
     // Reads the driver's modes (slow, so only when the modal opens or on request).
     void ReloadResolutions() {
         var cfg = owner.Configuration;
-        double desktop = Math.Max(1, cfg.DesktopWidth * (double)cfg.DesktopHeight);
         var choices = new List<ResolutionChoice>();
         try {
             choices = Native.LargerModes(owner.DisplayDevice, cfg.DesktopWidth, cfg.DesktopHeight)
-                .Select(m => new ResolutionChoice { Width = m.width, Height = m.height, MaxHz = m.hz, Factor = m.width * (double)m.height / desktop }).ToList();
+                .Select(m => new ResolutionChoice { Width = m.width, Height = m.height }).ToList();
         } catch { }
-        var current = new ResolutionChoice { Width = cfg.Width, Height = cfg.Height, Factor = cfg.Width * (double)cfg.Height / desktop };
+        var current = new ResolutionChoice { Width = cfg.Width, Height = cfg.Height };
         if (cfg.Width > 0 && !choices.Contains(current)) choices.Add(current);
         resolutions.Items = choices.Cast<object>().ToList();
         resolutions.SelectedItem = choices.FirstOrDefault(c => c.Equals(current));
-        resolutions.Technical=choices.Count>0;
-        var previousFont=resolutions.Font;resolutions.Font=choices.Count>0?Theme.Mono(10.5f):Theme.Body(10.5f);previousFont.Dispose();
+        resolutions.Technical = choices.Count > 0;
+        var previousFont = resolutions.Font; resolutions.Font = choices.Count > 0 ? Theme.Mono(10.5f) : Theme.Body(10.5f); previousFont.Dispose();
         if (choices.Count == 0) resolutions.Text = "Nenhuma disponível";
     }
 
@@ -306,14 +251,11 @@ public class SettingsOverlay : Modal {
         try {
             bool free = owner.RunningNames.Count == 0 && !owner.DisplayActive;
             switching.Checked = !owner.Paused;
-            switchingHelp.Text = owner.Paused ? "Desligado. A tela fica como está." : "Muda ao abrir um jogo e volta ao fechar.";
-            if (switchingHelp.Parent != null) switchingHelp.Parent.Invalidate();
             var screens = Screen.AllScreens.Select(s => new DisplayChoice { Device = s.DeviceName, Text = "Monitor " + new String(s.DeviceName.Where(Char.IsDigit).ToArray()) + (s.Primary ? " (principal)" : ""), Size = s.Bounds.Width + " × " + s.Bounds.Height }).ToList();
             monitors.Items = screens.Cast<object>().ToList();
             monitors.SelectedItem = screens.FirstOrDefault(s => s.Device == owner.DisplayDevice);
             monitors.Enabled = free;
             resolutions.Enabled = free && resolutions.Items.Count > 0;
-            var sel = resolutions.SelectedItem as ResolutionChoice;
             resolutionHelp.Text = resolutions.Items.Count == 0 ? "Nenhuma maior que a tela. Como ativar" : "Como funciona na NVIDIA e na AMD";
             resolutionHelp.ForeColor = Theme.Text;
             if (!resolutionHelp.Font.Underline) resolutionHelp.Font = new Font(resolutionHelp.Font, FontStyle.Underline);
@@ -321,44 +263,13 @@ public class SettingsOverlay : Modal {
             competitive.Enabled = free;
             startup.Checked = StartupShortcut.Enabled;
             taskbar.Checked = cfg.AutoRefreshTaskbar;
+            autoUpdate.Checked = cfg.CheckUpdates;
+            updateInfo.Text = !String.IsNullOrEmpty(owner.UpdateMessage) ? owner.UpdateMessage : AppInfo.Name + " " + AppInfo.Release;
+            updateButton.Text = owner.UpdateBusy ? "Aguarde…" : owner.Update == null ? "Procurar agora" : owner.UpdateInPlace ? "Atualizar" : "Ver no GitHub";
+            updateButton.Enabled = !owner.UpdateBusy;
             var level = logLevel.Items.Cast<LevelChoice>().FirstOrDefault(l => l.Value == (cfg.LogLevel ?? "all"));
             if (!Equals(logLevel.SelectedItem, level)) logLevel.SelectedItem = level;
         } finally { syncing = false; }
-
-        if (history.Visible) {
-            var fi = new FileInfo(Store.LogFile);
-            string stamp = fi.Exists ? fi.LastWriteTimeUtc.Ticks.ToString() : "";
-            if (stamp != logStamp) { logStamp = stamp; ReadLog(); }
-        }
-    }
-
-    void ReadLog() {
-        entries = new List<LogView.Entry>();
-        try {
-            var files = Directory.GetFiles(Store.Root, AppInfo.LogName + "*").OrderByDescending(f => f == Store.LogFile ? "~" : f);
-            foreach (string f in files) {
-                foreach (string line in Store.ReadLogLines(f).Reverse()) {
-                    var e = LogView.Parse(line);
-                    if (e != null) entries.Add(e);
-                    if (entries.Count >= 1500) break;
-                }
-                if (entries.Count >= 1500) break;
-            }
-        } catch { }
-        ShowLog();
-    }
-
-    void ShowLog() {
-        var kinds = new LogKind?[] { null, LogKind.Game, LogKind.Library, LogKind.System, LogKind.Error };
-        var labels = new[] { "Tudo", "Jogos", "Biblioteca", "Sistema", "Erros" };
-        int index = logFilter.Index;
-        logFilter.Tabs = kinds.Select((k, i) => new Segments.Tab { Label = labels[i], Count = k == null ? entries.Count : entries.Count(e => e.Kind == k) }).ToList();
-        logFilter.Width = logFilter.PreferredWidth();
-        logFilter.Select(index, false);
-        var kind = kinds[logFilter.Index];
-        log.EmptyText = kind == LogKind.Error ? "Nenhum erro registrado." : "Histórico vazio.";
-        log.SetEntries(entries.Where(e => kind == null || e.Kind == kind));
-        history.PerformLayout();
     }
 
     void Act(Action action) {

@@ -25,7 +25,8 @@ Enquanto o jogo estiver aberto, a área de trabalho também pode ficar na resolu
 - Biblioteca organizada por launcher, com capas e opção de abrir o jogo.
 - Jogos adicionados e removidos da biblioteca acompanhados automaticamente.
 - Lista de jogos ignorados que continua salva depois de reiniciar o PC.
-- Escolha do monitor, início com o Windows e histórico de atividades.
+- Escolha do monitor, início com o Windows e registro de atividade, com um botão que gera o log em .txt (Documentos/ResMode) para enviar quando precisar de ajuda.
+- Aviso quando sai uma versão nova no GitHub, com botão para baixar e instalar sem abrir o navegador. Dá para desligar em Configurações → Versão.
 - Restauração da resolução e tentativa de manter as outras janelas no lugar.
 - Opção de recuperar a nitidez da barra de tarefas ao voltar do jogo. Ela reinicia a interface do Explorer e fica desligada por padrão.
 
@@ -37,7 +38,7 @@ O ResMode não tem conta própria, anúncios nem envio automático de logs. A bi
 
 Você pode instalar o app normalmente em outros PCs. Cada instalação cria seus próprios dados; copiar os arquivos protegidos de um usuário ou computador para outro não é uma forma de transferir as configurações. A proteção também não impede o acesso por outro programa que já esteja rodando com a sua conta do Windows.
 
-Para identificar quais itens da Steam são jogos, o app pode consultar a loja com o número público do item. As capas e o tempo de jogo são lidos dos arquivos locais da Steam. [Veja os detalhes de privacidade](PRIVACY.md).
+Para identificar quais itens da Steam são jogos, o app pode consultar a loja com o número público do item. Para avisar de versões novas, ele consulta a lista de releases do GitHub (sem enviar nada seu) ao abrir e a cada 12 horas; o instalador só é executado se o SHA-256 baixado for o publicado no release. As capas e o tempo de jogo são lidos dos arquivos locais da Steam. [Veja os detalhes de privacidade](PRIVACY.md).
 
 ## Remover ou pedir ajuda
 
