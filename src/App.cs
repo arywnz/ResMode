@@ -34,6 +34,8 @@ public class AppContext : ApplicationContext {
     Dashboard dashboard;
     EventWaitHandle showRequest;
     Task<List<GameRule>> catalogTask;
+    Task<List<GameCandidate>> searchTask;
+    bool catalogRan;
     DateTime nextCatalog = DateTime.Now.AddSeconds(10);
     bool forceCatalog = true; // one quick scan after startup picks up anything installed while the app was closed
     DateTime nextShellCheck = DateTime.MinValue;
@@ -221,6 +223,7 @@ public class AppContext : ApplicationContext {
                     }
                 } else Store.Log("Atualização da biblioteca adiada: o PC voltou a ser usado ou a Steam não respondeu.", LogKind.Library);
                 catalogTask = null;
+                catalogRan = true;
                 nextCatalog = DateTime.Now.AddMinutes(5);
                 if (dashboard == null || dashboard.IsDisposed) Native.TrimMemory();
             }
@@ -229,6 +232,9 @@ public class AppContext : ApplicationContext {
                 forceCatalog = false;
                 catalogTask = Task.Factory.StartNew(() => Catalog.Scan(force));
             }
+
+            if (!config.FirstSearchDone && searchTask == null && catalogRan && catalogTask == null && games.Count == 0 && !active) StartFirstSearch();
+            if (searchTask != null && searchTask.IsCompleted) FinishFirstSearch();
 
             if (games.Count == 0 && !active && ShellRefresh.IsPending && DateTime.Now >= nextShellCheck) {
                 nextShellCheck = DateTime.Now.AddSeconds(10);
@@ -242,6 +248,41 @@ public class AppContext : ApplicationContext {
             Store.Log("Erro na detecção: " + e.Message, LogKind.Error);
         } finally {
             busy = false;
+        }
+    }
+
+    // First run: look for games outside the launchers once, in the background, and add what is found.
+    void StartFirstSearch() {
+        var known = new HashSet<string>(config.Games.Select(g => g.Exe), StringComparer.OrdinalIgnoreCase);
+        Store.Log("Procurando jogos no PC (primeira vez).", LogKind.Library);
+        searchTask = Task.Factory.StartNew(() => {
+            var found = new List<GameCandidate>();
+            GameFinder.Search(known.Contains, found.Add, folder => { }, System.Threading.CancellationToken.None);
+            return found;
+        }, System.Threading.CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
+    }
+
+    void FinishFirstSearch() {
+        var task = searchTask;
+        searchTask = null;
+        if (task.Status != TaskStatus.RanToCompletion) {
+            Store.Log("A busca por jogos no PC falhou: " + (task.Exception != null ? task.Exception.GetBaseException().Message : "cancelada") + ". Tenta de novo na próxima vez.", LogKind.Error);
+            return;
+        }
+        var added = new List<string>();
+        foreach (var game in task.Result) {
+            try {
+                if (game.Exes.Any(IsKnownExe)) continue;
+                GamePreferences.AddManual(config, game.Name, game.Exes);
+                added.Add(game.Name);
+            } catch (Exception e) { Store.Log("Não deu para adicionar " + game.Name + ": " + e.Message, LogKind.Error); }
+        }
+        config.FirstSearchDone = true;
+        SaveConfiguration();
+        Store.Log("Busca inicial terminou: " + added.Count + " jogo(s) fora dos launchers.", LogKind.Library);
+        if (added.Count > 0) {
+            ReportLibraryChange(added, new List<string>());
+            CheckCompetitiveNotice();
         }
     }
 
