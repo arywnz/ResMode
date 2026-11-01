@@ -7,12 +7,28 @@ using System.Threading;
 using System.Collections.Generic;
 
 public static class ShellRefresh {
+    static Process repairProcess;
+    static DateTime repairStarted;
+    public static bool IsBusy {get{
+        if(repairProcess==null)return false;
+        if(!repairProcess.HasExited&&(DateTime.UtcNow-repairStarted).TotalSeconds<60)return true;
+        if(!repairProcess.HasExited){repairProcess.Kill();Store.Log("A correção da barra excedeu o tempo permitido; consulte o registro da recuperação independente.",LogKind.Error);}
+        repairProcess.Dispose();repairProcess=null;return false;
+    }}
+    public static void Begin(string display){
+        if(IsBusy||!IsPending)return;
+        string encoded=Convert.ToBase64String(Encoding.UTF8.GetBytes(display??""));
+        repairProcess=Process.Start(new ProcessStartInfo(System.Windows.Forms.Application.ExecutablePath,"/shellrefresh "+encoded){UseShellExecute=false,CreateNoWindow=true});
+        repairStarted=DateTime.UtcNow;
+    }
     static string lastDeferral="";
     static void Defer(string reason){if(reason!=lastDeferral){lastDeferral=reason;Store.Log("Correção da barra esperando: "+reason);}}
     static string Pending {get{return Path.Combine(Store.Root,"barra-pendente.txt");}}
     static string RecoveryFile {get{return Path.Combine(Store.Root,"pastas-restauracao.xml");}}
     delegate bool Callback(IntPtr window,IntPtr data);
     [DllImport("user32.dll")] static extern IntPtr GetShellWindow();
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr FindWindow(string cls,string name);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)] static extern IntPtr SendMessageTimeout(IntPtr window,uint message,IntPtr wp,IntPtr lp,uint flags,uint timeout,out IntPtr result);
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window,out uint pid);
     [DllImport("user32.dll")] static extern bool EnumWindows(Callback callback,IntPtr param);
     [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
@@ -32,6 +48,58 @@ public static class ShellRefresh {
     public static void Request(){File.WriteAllText(Pending,DateTime.Now.ToString("s"));}
     public static void Cancel(){if(File.Exists(Pending))File.Delete(Pending);}
     static uint ShellPid(){uint id=0;IntPtr shell=GetShellWindow();if(shell!=IntPtr.Zero)GetWindowThreadProcessId(shell,out id);return id;}
+    public struct Status {
+        public uint DesktopPid,TrayPid;
+        public bool DesktopResponding,TrayResponding;
+        public bool Ready {get{return DesktopPid!=0&&DesktopPid==TrayPid&&DesktopResponding&&TrayResponding;}}
+    }
+    public sealed class ReadinessGate {
+        uint pid;long since;
+        public bool Observe(Status status,long milliseconds){
+            if(!status.Ready){pid=0;return false;}
+            if(pid!=status.DesktopPid){pid=status.DesktopPid;since=milliseconds;return false;}
+            return milliseconds-since>=750;
+        }
+    }
+    static bool Responds(IntPtr window){IntPtr result;return window!=IntPtr.Zero&&SendMessageTimeout(window,0,IntPtr.Zero,IntPtr.Zero,3,250,out result)!=IntPtr.Zero;}
+    static Status CurrentStatus(){
+        IntPtr desktop=GetShellWindow(),tray=FindWindow("Shell_TrayWnd",null);uint desktopPid=0,trayPid=0;
+        if(desktop!=IntPtr.Zero)GetWindowThreadProcessId(desktop,out desktopPid);
+        if(tray!=IntPtr.Zero)GetWindowThreadProcessId(tray,out trayPid);
+        return new Status{DesktopPid=desktopPid,TrayPid=trayPid,DesktopResponding=Responds(desktop),TrayResponding=tray!=IntPtr.Zero&&IsWindowVisible(tray)&&Responds(tray)};
+    }
+    static bool WaitReady(int timeout){
+        var clock=Stopwatch.StartNew();var gate=new ReadinessGate();
+        while(clock.ElapsedMilliseconds<timeout){if(gate.Observe(CurrentStatus(),clock.ElapsedMilliseconds))return true;Thread.Sleep(100);}return false;
+    }
+    static string ExplorerPath {get{return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe");}}
+    static bool OwnShell(Process process){return process.SessionId==Process.GetCurrentProcess().SessionId&&String.Equals(Native.Exe(process),ExplorerPath,StringComparison.OrdinalIgnoreCase);}
+    static void StartExplorer(){Process.Start(new ProcessStartInfo(ExplorerPath){UseShellExecute=true});}
+
+    // Armed before stopping Explorer. Survives a main/worker crash and retries at most once.
+    public static void Guard(int oldPid,string eventName){
+        if(!eventName.StartsWith("Local\\ResMode.ShellGuard.",StringComparison.Ordinal))return;
+        try{
+            using(var old=Process.GetProcessById(oldPid)){
+                if(!OwnShell(old))return;
+                using(var ready=EventWaitHandle.OpenExisting(eventName))ready.Set();
+                if(!old.WaitForExit(6000))return; // No restart was performed: leave the working shell alone.
+            }
+            if(WaitReady(1500))return;
+            if(ShellPid()==0)StartExplorer();
+            if(WaitReady(8000))return;
+            // A PID alone was the old false-success condition. A bounded retry is allowed only
+            // for the verified Windows shell with no visible Explorer work/file-copy windows.
+            if(File.Exists(Store.State)||DesktopLayout.GamePids(Store.LoadSettings().Games).Count>0){Store.Log("A nova tentativa do Explorer foi adiada porque um jogo abriu.");return;}
+            uint current=ShellPid();
+            if(current!=0){using(var shell=Process.GetProcessById((int)current)){
+                if(!OwnShell(shell)||HasExplorerWindows(current,new List<Folder>()))return;
+                shell.Kill();shell.WaitForExit(2000);
+            }}
+            StartExplorer();
+            if(!WaitReady(8000))Store.Log("A área de trabalho não confirmou a recuperação. O reinício não será repetido em loop.",LogKind.Error);
+        }catch(Exception e){Store.Log("Falha na recuperação independente do Explorer: "+e.Message,LogKind.Error);}
+    }
     static bool HasExplorerWindows(uint id,List<Folder> folders){
         bool busy=false;
         var blockers=new List<string>();
@@ -46,8 +114,10 @@ public static class ShellRefresh {
     }
     public static bool TryRun(string gameDisplay){
         if(!IsPending)return true;
-        uint id=ShellPid();if(id==0){Defer("a barra de tarefas ainda não carregou.");return false;}
+        if(File.Exists(Store.State)||DesktopLayout.GamePids(Store.LoadSettings().Games).Count>0){Defer("um jogo está aberto.");return false;}
+        uint id=ShellPid();if(!CurrentStatus().Ready){Defer("a área de trabalho e a barra de tarefas ainda não estão prontas.");return false;}
         try{
+            if(!WaitReady(2000)){Defer("a área de trabalho ainda está estabilizando.");return false;}
             if(File.Exists(RecoveryFile)){if(!RestoreFolders(Store.Read<List<Folder>>(RecoveryFile)))return false;File.Delete(RecoveryFile);Cancel();return true;}
             var folders=Folders();if(HasExplorerWindows(id,folders))return false;
             using(var shell=Process.GetProcessById((int)id)){
@@ -56,11 +126,14 @@ public static class ShellRefresh {
                 // Check again immediately before acting, and preserve other monitors across the shell restart.
                 var windows=DesktopLayout.Capture(gameDisplay,true,DesktopLayout.GamePids(Store.LoadSettings().Games));folders=Folders();if(HasExplorerWindows(id,folders))return false;
                 string recovery=RecoveryFile;Store.Write(recovery,folders);
-                shell.Kill();shell.WaitForExit(2000);
-                Thread.Sleep(800);
-                if(ShellPid()==0)Process.Start(new ProcessStartInfo(expected){UseShellExecute=false});
-                for(int i=0;i<50&&ShellPid()==0;i++)Thread.Sleep(100);
-                uint next=ShellPid();if(next==0||next==id){Store.Log("A barra de tarefas ainda não voltou depois da correção.", LogKind.Error);return false;}
+                string eventName="Local\\ResMode.ShellGuard."+Guid.NewGuid().ToString("N");
+                using(var armed=new EventWaitHandle(false,EventResetMode.ManualReset,eventName))
+                using(var guard=Process.Start(new ProcessStartInfo(System.Windows.Forms.Application.ExecutablePath,"/shellguard "+id+" "+eventName){UseShellExecute=false,CreateNoWindow=true})){
+                    if(!armed.WaitOne(4000)){Store.Log("A recuperação independente não iniciou; o Explorer foi preservado.",LogKind.Error);return false;}
+                    if(File.Exists(Store.State)||DesktopLayout.GamePids(Store.LoadSettings().Games).Count>0){Defer("um jogo acabou de abrir.");return false;}
+                    shell.Kill();shell.WaitForExit(2000);
+                    if(!WaitReady(25000)||ShellPid()==id){Store.Log("A área de trabalho e a barra ainda não confirmaram a volta; recuperação pendente.",LogKind.Error);return false;}
+                }
                 bool restored=RestoreFolders(folders);DesktopLayout.Settle(windows);Cancel();lastDeferral="";if(restored&&File.Exists(recovery))File.Delete(recovery);Store.Log("Barra de tarefas recriada"+(folders.Count>0?(restored?"; pastas abertas de novo.":"; algumas pastas não reabriram."):"."));return true;
             }
         }catch(Exception e){Store.Log("Correção da barra adiada: "+e.Message, LogKind.Error);return false;}
@@ -73,5 +146,18 @@ public static class ShellRefresh {
             if(found==null){all=false;continue;}used.Add(found.Handle);var p=folder.Placement;p.Length=Marshal.SizeOf(typeof(DesktopLayout.Placement));p.Flags|=4;if(p.Show==1)p.Show=4;SetWindowPlacement(new IntPtr(found.Handle),ref p);
         }catch(Exception e){all=false;Store.Log("Não deu para reabrir a pasta "+folder.Path+": "+e.Message, LogKind.Error);}}
         return all;
+    }
+
+    public static void ReadinessTests(){
+        var gate=new ReadinessGate();
+        if(gate.Observe(new Status{DesktopPid=7,DesktopResponding=true},5000))throw new Exception("Desktop PID without taskbar was accepted.");
+        if(gate.Observe(new Status{DesktopPid=7,TrayPid=8,DesktopResponding=true,TrayResponding=true},5001))throw new Exception("Stale taskbar from a different process was accepted.");
+        if(gate.Observe(new Status{DesktopPid=7,TrayPid=7,DesktopResponding=true},5002))throw new Exception("Unresponsive taskbar was accepted.");
+        var good=new Status{DesktopPid=7,TrayPid=7,DesktopResponding=true,TrayResponding=true};
+        if(gate.Observe(good,6000)||gate.Observe(good,6749)||!gate.Observe(good,6750))throw new Exception("Shell stability interval was not respected.");
+        good.DesktopPid=9;good.TrayPid=9;
+        if(gate.Observe(good,6800))throw new Exception("Replacement shell inherited the previous shell's stability.");
+        gate.Observe(new Status(),7000);
+        if(gate.Observe(good,7100)||!gate.Observe(good,7850))throw new Exception("Failed shell readiness did not reset stabilization.");
     }
 }

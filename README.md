@@ -27,7 +27,7 @@ Enquanto o jogo estiver aberto, a área de trabalho também pode ficar na resolu
 - Lista de jogos ignorados que continua salva depois de reiniciar o PC.
 - Escolha do monitor, início com o Windows e histórico de atividades.
 - Restauração da resolução e tentativa de manter as outras janelas no lugar.
-- Opção de recuperar a nitidez da barra de tarefas ao voltar do jogo. Ela pode reiniciar a interface do Explorer.
+- Opção de recuperar a nitidez da barra de tarefas ao voltar do jogo. Ela reinicia a interface do Explorer e fica desligada por padrão.
 
 A função de conquistas foi removida. O ResMode não modifica arquivos dos jogos, não altera saves e não injeta código neles. O comportamento das janelas ainda pode variar conforme o jogo, o driver e os outros programas abertos.
 
