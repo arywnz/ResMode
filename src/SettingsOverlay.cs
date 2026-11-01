@@ -12,7 +12,7 @@ public class SettingsOverlay : Modal {
     readonly SmoothScroll general;
     readonly Panel generalColumn;
     readonly SelectBox monitors, resolutions, logLevel;
-    readonly ToggleSwitch switching, competitive, startup, taskbar, autoUpdate;
+    readonly ToggleSwitch switching, competitive, startup, taskbar, autoUpdate, centerSecond;
     readonly Label resolutionHelp, updateInfo;
     readonly FlatButton updateButton;
     readonly System.Windows.Forms.Timer refresh;
@@ -45,6 +45,8 @@ public class SettingsOverlay : Modal {
         new ToolTip().SetToolTip(reload, "Atualizar a lista");
         resolutionHelp = new Label { Cursor = Cursors.Hand };
         resolutionHelp.Click += delegate { ShowResolutionHelp(); };
+        centerSecond = new ToggleSwitch();
+        centerSecond.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetCenterSecondMonitor(centerSecond.Checked)); };
         competitive = new ToggleSwitch();
         competitive.CheckedChanged += delegate { if (!syncing) Act(() => owner.SetSkipCompetitive(competitive.Checked)); };
         startup = new ToggleSwitch();
@@ -76,7 +78,8 @@ public class SettingsOverlay : Modal {
             Row("Trocar resolução nos jogos", null, null, switching, true),
             Group("Tela",
                 Row("Monitor", null, null, monitors),
-                Row("Resolução nos jogos", null, resolutionHelp, Pair(reload, resolutions))),
+                Row("Resolução nos jogos", null, resolutionHelp, Pair(reload, resolutions)),
+                Row("Centralizar o 2º monitor", "Durante o jogo, alinha o segundo monitor ao meio do principal.", null, centerSecond)),
             Group("Jogos",
                 Row("Ignorar competitivos", "Ficam na resolução nativa, onde FPS e latência pesam mais que nitidez.", null, competitive)),
             Group("Sistema",
@@ -260,6 +263,8 @@ public class SettingsOverlay : Modal {
             resolutionHelp.Text = resolutions.Items.Count == 0 ? "Nenhuma maior que a tela. Como ativar" : "Como funciona na NVIDIA e na AMD";
             resolutionHelp.ForeColor = Theme.Text;
             if (!resolutionHelp.Font.Underline) resolutionHelp.Font = new Font(resolutionHelp.Font, FontStyle.Underline);
+            centerSecond.Checked = cfg.CenterSecondMonitor;
+            centerSecond.Enabled = free;
             competitive.Checked = cfg.SkipCompetitive;
             competitive.Enabled = free;
             startup.Checked = StartupShortcut.Enabled;

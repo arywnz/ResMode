@@ -538,6 +538,30 @@ public class AppContext : ApplicationContext {
         } catch (Exception e) { Store.Log("Erro ao manter a resolução do jogo: " + e.Message, LogKind.Error); }
     }
 
+    // After the game's monitor grows, a monitor beside it keeps hanging from the top edge, so the mouse only crosses over at
+    // the top and the two stop lining up the way they sit on the desk. Centre each side-by-side monitor on the game's one.
+    // Only monitors that touch it left or right are moved; the original spot is in the recovery file and comes back with the desktop mode.
+    void CenterNeighbours(string device, MonitorSpot before, List<MonitorSpot> others) {
+        try {
+            var after = Native.ActiveMonitors().FirstOrDefault(m => String.Equals(m.Device, device, StringComparison.OrdinalIgnoreCase));
+            if (after == null) return;
+            foreach (var o in others) {
+                bool right = o.X == before.X + before.Width, left = o.X + o.Width == before.X;
+                if (!right && !left) continue; // above/below: leave it to Windows
+                int x = right ? after.X + after.Width : o.X;
+                int y = after.Y + (after.Height - o.Height) / 2;
+                int rc = Native.SetPosition(o.Device, x, y);
+                if (rc != 0) Store.Log("Não deu para centralizar o monitor " + o.Device + " (código " + rc + ").", LogKind.Error);
+            }
+        } catch (Exception e) { Store.Log("Erro ao centralizar o segundo monitor: " + e.Message, LogKind.Error); }
+    }
+
+    public void SetCenterSecondMonitor(bool enabled) {
+        RequireNoGames();
+        config.CenterSecondMonitor = enabled;
+        SaveConfiguration();
+    }
+
     void Apply() {
         if (config.Width == 0) throw new Exception("Nenhuma resolução maior que a do desktop está disponível. " + Native.EnableHint);
         string device = Device();
@@ -560,7 +584,10 @@ public class AppContext : ApplicationContext {
         DesktopLayout.CancelDesktopRestore();
         var windows = DesktopLayout.Capture(device, true, DesktopLayout.GamePids(config.Games));
         int ownerPid = Process.GetCurrentProcess().Id;
-        Store.Write(Store.State, new Recovery { Device = device, Width = deskW, Height = deskH, Hz = desktop.hz, Bits = desktop.bits, OwnerPid = ownerPid, Windows = windows });
+        var monitors = Native.ActiveMonitors();
+        var before = monitors.FirstOrDefault(m => String.Equals(m.Device, device, StringComparison.OrdinalIgnoreCase));
+        var others = monitors.Where(m => !String.Equals(m.Device, device, StringComparison.OrdinalIgnoreCase)).ToList();
+        Store.Write(Store.State, new Recovery { Device = device, Width = deskW, Height = deskH, Hz = desktop.hz, Bits = desktop.bits, OwnerPid = ownerPid, Windows = windows, Others = others });
         active = true;
         DesktopLayout.Track(windows, ownerPid);
         int rc = Native.Set(device, target, false);
@@ -570,6 +597,7 @@ public class AppContext : ApplicationContext {
             active = File.Exists(Store.State);
             throw new Exception("O monitor não aceitou " + config.Width + " × " + config.Height + ".");
         }
+        if (config.CenterSecondMonitor && before != null) CenterNeighbours(device, before, others);
         DesktopLayout.Settle(windows.Where(w => !String.Equals(w.Device, device, StringComparison.OrdinalIgnoreCase)).ToList());
         Store.Log("Resolução de jogo ligada: " + after.width + " × " + after.height + " a " + after.hz + " Hz.", LogKind.Game);
         // No icon: Windows then shows only the app's own icon in the header, instead of a generic blue "i".

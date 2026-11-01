@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.11";
+    public const string Release = "0.2.2-alpha.12";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -31,6 +31,8 @@ public class Settings {
     public bool CompetitiveNotified = false;
     // The first-run search for games outside the launchers has finished.
     public bool FirstSearchDone = false;
+    // While a game runs, the monitor beside the game's is centred on it instead of hanging from its top edge.
+    public bool CenterSecondMonitor = true;
     // History: "all", "games" (game sessions only) or "off"; errors are always kept.
     public string LogLevel = "all";
     // Looks for a newer GitHub release at startup and every 15 minutes; AnnouncedUpdate keeps the tray balloon to once per version.
@@ -41,7 +43,10 @@ public class Settings {
     public List<GameRule> Games = new List<GameRule>();
 }
 
-public class Recovery { public string Device; public int Width, Height, Hz, Bits, OwnerPid; public List<DesktopLayout.Saved> Windows=new List<DesktopLayout.Saved>(); }
+// Where another monitor sits on the desktop (in each monitor's own pixels), kept so it can go back after the game.
+public class MonitorSpot { public string Device; public int X, Y, Width, Height; }
+
+public class Recovery { public string Device; public int Width, Height, Hz, Bits, OwnerPid; public List<DesktopLayout.Saved> Windows=new List<DesktopLayout.Saved>(); public List<MonitorSpot> Others=new List<MonitorSpot>(); }
 
 public static class Native {
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -94,6 +99,40 @@ public static class Native {
         Mode m = Empty();
         if (!EnumDisplaySettingsEx(device, -1, ref m, 0)) throw new Exception("Não foi possível consultar o monitor.");
         return m;
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct DisplayDevice {
+        public int cb;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string name;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string description;
+        public int flags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string id;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)] public string key;
+    }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool EnumDisplayDevices(string device, int index, ref DisplayDevice value, int flags);
+
+    // Every monitor that is part of the desktop, with its true position and size (not DPI-scaled).
+    public static List<MonitorSpot> ActiveMonitors() {
+        var list = new List<MonitorSpot>();
+        for (int i = 0; ; i++) {
+            var d = new DisplayDevice { cb = Marshal.SizeOf(typeof(DisplayDevice)) };
+            if (!EnumDisplayDevices(null, i, ref d, 0)) break;
+            if ((d.flags & 1) == 0) continue; // DISPLAY_DEVICE_ATTACHED_TO_DESKTOP
+            Mode m = Empty();
+            if (EnumDisplaySettingsEx(d.name, -1, ref m, 0)) list.Add(new MonitorSpot { Device = d.name, X = m.x, Y = m.y, Width = m.width, Height = m.height });
+        }
+        return list;
+    }
+
+    // Moves a monitor without changing its mode. The position is written to the registry like the game resolution.
+    public static int SetPosition(string device, int x, int y) {
+        Mode m = Current(device);
+        m.x = x;
+        m.y = y;
+        m.fields = 0x20 | 0x40000 | 0x80000 | 0x100000 | 0x400000; // position, bits, width, height, frequency
+        m.extra = 0;
+        return ChangeDisplaySettingsEx(device, ref m, IntPtr.Zero, 1, IntPtr.Zero);
     }
 
     public static List<Mode> Modes(string device) {

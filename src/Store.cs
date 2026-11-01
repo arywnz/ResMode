@@ -99,6 +99,12 @@ public static class Store {
             var currentWindows = DesktopLayout.Capture(r.Device, true, DesktopLayout.GamePids(LoadSettings().Games));
             var windows = DesktopLayout.RecoveryWindows(r.Windows, currentWindows);
             int rc = Native.Set(r.Device, m, false);
+            // Monitors that were moved beside the game's go back to where they were.
+            if (rc == 0 && r.Others != null)
+                foreach (var o in r.Others) {
+                    try { if (Native.SetPosition(o.Device, o.X, o.Y) != 0) Log("Não deu para devolver o monitor " + o.Device + " ao lugar.", LogKind.Error); }
+                    catch (Exception e) { Log("Erro ao devolver o monitor " + o.Device + ": " + e.Message, LogKind.Error); }
+                }
             var now = Native.Current(r.Device);
             bool ok = rc == 0 && now.width == r.Width && now.height == r.Height;
             Log(ok ? "Resolução normal de volta: " + r.Width + " × " + r.Height + " a " + m.hz + " Hz."

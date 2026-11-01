@@ -4,7 +4,7 @@ Use uma resolução maior nos jogos sem precisar deixar o Windows assim o dia in
 
 ## Baixar
 
-### [⬇ Baixar ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.11/ResMode-0.2.2-alpha.11-win-x64.msi)
+### [⬇ Baixar ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.12/ResMode-0.2.2-alpha.12-win-x64.msi)
 
 Para **Windows 10 ou 11, de 64 bits**. Esta é uma versão de testes. [Outras versões e arquivos](https://github.com/arywnz/ResMode/releases).
 
