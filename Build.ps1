@@ -18,5 +18,5 @@ $exe = Join-Path $OutputDirectory 'ResMode.exe'
     /reference:System.Web.Extensions.dll /reference:Microsoft.CSharp.dll /reference:System.Security.dll $resources $sources
 if ($LASTEXITCODE -ne 0) { throw 'Compilation failed.' }
 $metadata = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
-if ($metadata.ProductName -ne 'ResMode' -or $metadata.FileVersion -ne '0.2.1.0') { throw 'Unexpected release metadata.' }
+if ($metadata.ProductName -ne 'ResMode' -or $metadata.FileVersion -ne '0.2.2.0') { throw 'Unexpected release metadata.' }
 Write-Output "Built $exe"

@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 
 // Cover art from the local Steam library cache, or the game's own icon. Nothing is downloaded.
 public static class Artwork {
-    // The card background uses a representative colour from the original cover pixels.
+    // Only the cover frame uses a dominant colour from the original cover pixels.
     // LoadedTicks: when the art became available, so the grid can fade it in instead of popping.
     // Cover comes with its rounded corners already cut (premultiplied alpha), so the grid copies it as is
     // every frame, without clipping, hover filters or resampling.
@@ -100,16 +100,17 @@ public static class Artwork {
         if(owns)pixels=new Bitmap(image);
         try {
             var buckets = new Dictionary<int,List<Color>>();
-            for (int x = 0; x < 8; x++)
-                for (int y = 0; y < 8; y++) {
+            for (int x = 0; x < 16; x++)
+                for (int y = 0; y < 24; y++) {
                     // Sample the original pixels: resizing can change even a solid cover's RGB values.
-                    var c = pixels.GetPixel(Math.Min(pixels.Width-1,(2*x+1)*pixels.Width/16),Math.Min(pixels.Height-1,(2*y+1)*pixels.Height/16));
+                    var c = pixels.GetPixel(Math.Min(pixels.Width-1,(2*x+1)*pixels.Width/32),Math.Min(pixels.Height-1,(2*y+1)*pixels.Height/48));
                     if(c.A<128||c.GetBrightness()<.08f)continue;
-                    int key=(c.R/32)<<6|(c.G/32)<<3|c.B/32;List<Color> group;
+                    // Coarse groups keep nearby shades together. Area wins over a small bright logo.
+                    int key=(c.R/64)<<4|(c.G/64)<<2|c.B/64;List<Color> group;
                     if(!buckets.TryGetValue(key,out group))buckets[key]=group=new List<Color>();group.Add(c);
                 }
             if(buckets.Count==0)return Theme.Muted;
-            var dominant=buckets.Values.OrderByDescending(group=>Math.Pow(group.Count,.65)*(.2+group.Average(c=>c.GetSaturation()))*(.25+Math.Sqrt(group.Average(c=>c.GetBrightness())))).First();
+            var dominant=buckets.Values.OrderByDescending(group=>group.Count).First();
             return Color.FromArgb((int)dominant.Average(c=>c.R),(int)dominant.Average(c=>c.G),(int)dominant.Average(c=>c.B));
         } finally {if(owns)pixels.Dispose();}
     }
@@ -136,12 +137,15 @@ public static class Artwork {
         }
     }
 
-    // A bounded coloured surface behind cover + label. No cover bitmap is blurred or tinted.
-    public static void DrawCardBackground(Graphics g,Rectangle card,Color tint,float amount){
+    // A crisp outer frame around the image only. Labels and cover pixels are not tinted.
+    public static void DrawCoverFrame(Graphics g,Rectangle cover,Color tint,float amount){
         amount=Math.Max(0,Math.Min(1,amount));if(amount<=0)return;
-        var frame=Rectangle.Inflate(card,Theme.S(6),Theme.S(6));
+        // Keep dark covers' hue/channel ratios while making their thin frame readable on black.
+        int peak=Math.Max(tint.R,Math.Max(tint.G,tint.B));
+        if(peak>0&&peak<112)tint=Color.FromArgb(tint.R*112/peak,tint.G*112/peak,tint.B*112/peak);
+        var frame=Rectangle.Inflate(cover,Theme.S(4),Theme.S(4));
         using(var path=Theme.Round(frame,Radius+Theme.S(4)))
-        using(var fill=new LinearGradientBrush(frame,Color.FromArgb((int)(155*amount),tint),Color.FromArgb((int)(85*amount),tint),90f))
-        using(var edge=new Pen(Color.FromArgb((int)(115*amount),tint),Theme.S(1))){g.FillPath(fill,path);g.DrawPath(edge,path);}
+        using(var fill=new SolidBrush(Color.FromArgb((int)(230*amount),tint)))
+        using(var edge=new Pen(Color.FromArgb((int)(255*amount),tint),Theme.S(1))){g.FillPath(fill,path);g.DrawPath(edge,path);}
     }
 }
