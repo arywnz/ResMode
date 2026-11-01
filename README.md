@@ -33,7 +33,7 @@ A função de conquistas foi removida. O ResMode não modifica arquivos dos jogo
 
 ## Seus dados
 
-O ResMode não tem conta própria, anúncios nem envio automático de logs. A biblioteca, as preferências e o histórico ficam no seu PC. Os arquivos gravados pelo aplicativo são protegidos com a criptografia do próprio Windows, ligada ao seu usuário. Não há uma senha ou chave compartilhada dentro do instalador.
+O ResMode não tem conta própria, anúncios nem envio automático de logs. A biblioteca, as preferências e o histórico ficam no seu PC e são protegidos com a criptografia do próprio Windows, ligada ao seu usuário. Não há uma senha ou chave compartilhada dentro do instalador.
 
 Você pode instalar o app normalmente em outros PCs. Cada instalação cria seus próprios dados; copiar os arquivos protegidos de um usuário ou computador para outro não é uma forma de transferir as configurações. A proteção também não impede o acesso por outro programa que já esteja rodando com a sua conta do Windows.
 

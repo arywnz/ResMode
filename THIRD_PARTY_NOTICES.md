@@ -18,3 +18,5 @@ Windows, .NET Framework, system DLLs and system icon fonts are used through oper
 ## Build tooling
 
 GitHub Actions tooling and the SignPath submission action execute in CI; their code is not linked into or bundled with ResMode.exe. Each workflow pins external actions to a commit. Their upstream licenses apply to those tools.
+
+The MSI is built with WiX Toolset 4.0.6 and its unmodified standard UI/.NET detection extensions. WiX is Copyright (c) .NET Foundation and contributors, Microsoft Reciprocal License (MS-RL). Its notice/license is included as WIX-LICENSE.txt in the MSI installation; the public release also provides the corresponding upstream source archive. Source and license: https://github.com/wixtoolset/wix/tree/v4.0.6 . ResMode.exe does not link to WiX code; the MSI's WiX-derived UI retains the upstream license.
