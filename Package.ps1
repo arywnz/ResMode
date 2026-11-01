@@ -1,7 +1,7 @@
 param(
     [string]$BinaryDirectory = (Join-Path $PSScriptRoot 'dist'),
     [string]$OutputDirectory = (Join-Path $PSScriptRoot 'releases\package'),
-    [string]$ArchivePath = (Join-Path $PSScriptRoot 'releases\ResMode-0.2.2-alpha.3-win-x64-unsigned.zip')
+    [string]$ArchivePath = (Join-Path $PSScriptRoot 'releases\ResMode-0.2.2-alpha.4-win-x64-unsigned.zip')
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot

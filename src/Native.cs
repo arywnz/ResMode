@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.3";
+    public const string Release = "0.2.2-alpha.4";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }

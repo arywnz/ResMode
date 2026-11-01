@@ -101,7 +101,8 @@ public static class DesktopLayout {
             var current=Info(MonitorFromWindow(s.Handle,2));if(onlyWrongMonitor&&String.Equals(current.Device,s.Device,StringComparison.OrdinalIgnoreCase))continue;
             if(IsIconic(s.Handle)!=s.Minimized)continue; // Respect minimize/restore actions after the snapshot.
             if(IsZoomed(s.Handle)!=s.Maximized)continue; // Do not undo a maximize/restore chosen during play.
-            uint dpi=Dpi(s.Handle);if(s.Dpi!=0&&dpi!=0&&s.Dpi!=dpi)continue;
+            // A DPI change is no reason to leave the window behind: the mode switch itself makes Windows rescale a window
+            // (Parsec: 96 -> 144 dpi) while dropping it on the wrong monitor. The saved rectangle belongs to the saved monitor, whose DPI it matches.
             int dx=target.Bounds.Left-s.Bounds.Left,dy=target.Bounds.Top-s.Bounds.Top;
             if(s.Minimized){
                 var placement=s.Placement;placement.Length=Marshal.SizeOf(typeof(Placement));placement.Flags|=4;placement.Show=7; // async; minimized without activating
