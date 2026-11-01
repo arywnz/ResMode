@@ -15,8 +15,8 @@ $resources += '/resource:' + (Join-Path $root 'assets\fonts\OFL.txt') + ',ResMod
 $exe = Join-Path $OutputDirectory 'ResMode.exe'
 & $compiler /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 "/out:$exe" "/win32icon:$(Join-Path $OutputDirectory 'ResMode.ico')" "/win32manifest:$(Join-Path $root 'app.manifest')" `
     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Xml.dll /reference:System.Core.dll `
-    /reference:System.Web.Extensions.dll /reference:Microsoft.CSharp.dll $resources $sources
+    /reference:System.Web.Extensions.dll /reference:Microsoft.CSharp.dll /reference:System.Security.dll $resources $sources
 if ($LASTEXITCODE -ne 0) { throw 'Compilation failed.' }
 $metadata = [Diagnostics.FileVersionInfo]::GetVersionInfo($exe)
-if ($metadata.ProductName -ne 'ResMode' -or $metadata.FileVersion -ne '0.1.0.0') { throw 'Unexpected release metadata.' }
+if ($metadata.ProductName -ne 'ResMode' -or $metadata.FileVersion -ne '0.2.0.0') { throw 'Unexpected release metadata.' }
 Write-Output "Built $exe"

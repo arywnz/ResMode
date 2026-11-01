@@ -30,3 +30,5 @@ catalogo.xml
 restauracao.xml
 pastas-restauracao.xml
 *.zip
+.wix/
+*.wixpdb

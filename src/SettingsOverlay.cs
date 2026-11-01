@@ -337,7 +337,7 @@ public class SettingsOverlay : Modal {
         try {
             var files = Directory.GetFiles(Store.Root, AppInfo.LogName + "*").OrderByDescending(f => f == Store.LogFile ? "~" : f);
             foreach (string f in files) {
-                foreach (string line in File.ReadLines(f).Reverse()) {
+                foreach (string line in Store.ReadLogLines(f).Reverse()) {
                     var e = LogView.Parse(line);
                     if (e != null) entries.Add(e);
                     if (entries.Count >= 1500) break;

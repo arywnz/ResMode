@@ -418,12 +418,8 @@ public class GamePanel : Painted {
     public readonly FlatButton Toggle, Folder;
     readonly LibraryGame game;
     readonly Playtime.Info time;
-    SteamAchievements.Progress achievements=new SteamAchievements.Progress{Message="Sincronizando com a Steam…"};
-    readonly System.Windows.Forms.Timer achievementSync;
-    bool achievementReadPending;
     Rectangle Thumb { get { return new Rectangle(Theme.S(18), Theme.S(18), Theme.S(64), Theme.S(96)); } }
     Rectangle Stats { get { return new Rectangle(Theme.S(18), Thumb.Bottom + Theme.S(16), Width - Theme.S(36), Theme.S(58)); } }
-    Rectangle Achievements {get{return new Rectangle(Theme.S(18),Stats.Bottom+Theme.S(12),Width-Theme.S(36),Theme.S(76));}}
 
     public GamePanel(LibraryGame game, bool running) {
         this.game = game;
@@ -434,21 +430,11 @@ public class GamePanel : Painted {
         Toggle = new FlatButton { Kind = ButtonKind.Quiet, AlignLeft = true, Height = Theme.S(38), Font = Theme.Body(10.5f),
             Glyph = game.Excluded ? Theme.IconCheck : Theme.IconPause, Text = game.Excluded ? "Usar resolução de jogo" : "Ignorar este jogo" };
         Folder = new FlatButton { Kind = ButtonKind.Quiet, AlignLeft = true, Height = Theme.S(38), Font = Theme.Body(10.5f), Glyph = Theme.IconFolder, Text = "Abrir pasta" };
-        Play.SetBounds(Theme.S(18), Achievements.Bottom + Theme.S(14), Width - Theme.S(36), Play.Height);
+        Play.SetBounds(Theme.S(18), Stats.Bottom + Theme.S(14), Width - Theme.S(36), Play.Height);
         Toggle.SetBounds(Theme.S(8), Play.Bottom + Theme.S(17), Width - Theme.S(16), Toggle.Height);
         Folder.SetBounds(Theme.S(8), Toggle.Bottom + Theme.S(2), Width - Theme.S(16), Folder.Height);
         Height = Folder.Bottom + Theme.S(10);
         Controls.AddRange(new Control[] { Play, Toggle, Folder });
-        achievementSync=new System.Windows.Forms.Timer{Interval=2000};achievementSync.Tick+=delegate{ReadAchievements();};
-        VisibleChanged+=delegate{if(Visible){ReadAchievements();achievementSync.Start();}else achievementSync.Stop();};
-    }
-    protected override void OnHandleCreated(EventArgs e){base.OnHandleCreated(e);ReadAchievements();}
-    void ReadAchievements(){
-        if(achievementReadPending||IsDisposed||!IsHandleCreated)return;achievementReadPending=true;
-        System.Threading.Tasks.Task.Factory.StartNew(()=>SteamAchievements.Get(game.Key)).ContinueWith(task=>{
-            if(IsDisposed||!IsHandleCreated)return;
-            try{BeginInvoke(new Action(delegate{if(IsDisposed)return;achievementReadPending=false;if(task.IsFaulted){var observed=task.Exception;achievements=new SteamAchievements.Progress();}else achievements=task.Result;Invalidate(Achievements);}));}catch(InvalidOperationException){}
-        });
     }
 
     protected override void OnPaint(PaintEventArgs e) {
@@ -495,19 +481,8 @@ public class GamePanel : Painted {
             Theme.DrawText(g, "Tempo jogado", label, Theme.Faint, new Rectangle(stats.X + half + Theme.S(14), stats.Y + Theme.S(9), half - Theme.S(20), Theme.S(18)));
             Theme.DrawText(g, Playtime.FormatTotal(time.Total), time.Total.TotalMinutes>=1?number:value, Theme.Text, new Rectangle(stats.X + half + Theme.S(14), stats.Y + Theme.S(27), half - Theme.S(20), Theme.S(22)));
         }
-        var progress=Achievements;Theme.Fill(g,progress,Theme.S(10),Theme.Surface);
-        using(var label=Theme.Body(10,true))using(var number=Theme.Mono(10.5f,true))using(var caption=Theme.Body(9.5f)){
-            Theme.DrawText(g,"Conquistas",label,Theme.Text,new Rectangle(progress.X+Theme.S(14),progress.Y+Theme.S(8),Theme.S(130),Theme.S(23)));
-            if(achievements.Available&&achievements.Total>0){
-                Theme.DrawText(g,achievements.Unlocked+" / "+achievements.Total,number,Theme.Text,new Rectangle(progress.X+Theme.S(142),progress.Y+Theme.S(8),progress.Width-Theme.S(156),Theme.S(23)),TextFormatFlags.Right|TextFormatFlags.VerticalCenter);
-                var bar=new RectangleF(progress.X+Theme.S(14),progress.Y+Theme.S(36),progress.Width-Theme.S(28),Theme.S(4));Theme.Fill(g,bar,Theme.S(2),Theme.Border);
-                if(achievements.Unlocked>0)Theme.Fill(g,new RectangleF(bar.X,bar.Y,bar.Width*achievements.Unlocked/achievements.Total,bar.Height),Theme.S(2),Theme.Text);
-            }
-            Theme.DrawText(g,achievements.Message,caption,Theme.Muted,new Rectangle(progress.X+Theme.S(14),progress.Y+Theme.S(46),progress.Width-Theme.S(28),Theme.S(22)));
-        }
         using (var p = new Pen(Theme.Border)) g.DrawLine(p, 0, Play.Bottom + Theme.S(8), Width, Play.Bottom + Theme.S(8));
     }
-    protected override void Dispose(bool disposing){if(disposing&&achievementSync!=null)achievementSync.Dispose();base.Dispose(disposing);}
 }
 
 // Short explanation card: a title, then paragraphs; a paragraph may have a heading with a coloured dot.

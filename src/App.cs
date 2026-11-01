@@ -470,8 +470,7 @@ public class AppContext : ApplicationContext {
 
     public void OpenLog() {
         if (!File.Exists(Store.LogFile)) Store.Log("Registro iniciado.");
-        // Full system path, so a notepad.exe elsewhere on PATH or in the working folder is never picked up.
-        Process.Start(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "notepad.exe"), "\"" + Store.LogFile + "\"");
+        LogWindow.ShowLog();
     }
 
     public void Quit() {
