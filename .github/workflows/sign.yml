@@ -1,0 +1,78 @@
+name: Sign reviewed release
+
+# Configure the protected signing environment and SignPath first. Never run on PRs.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Reviewed release tag (for example v0.1.0-alpha.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: sign-resmode
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    if: github.ref == 'refs/heads/main' && vars.SIGNPATH_ENABLED == 'true'
+    environment: signing
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify reviewed source tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+(?:-[A-Za-z0-9.-]+)?$') { throw 'Invalid release tag.' }
+          $commit = git rev-parse --verify "$($env:RELEASE_TAG)^{commit}"
+          if ($LASTEXITCODE -ne 0) { throw 'Release tag does not exist.' }
+          git merge-base --is-ancestor $commit HEAD
+          if ($LASTEXITCODE -ne 0) { throw 'Tag must belong to reviewed main history.' }
+          git checkout --detach $commit
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to check out release source.' }
+      - name: Build and test from source
+        run: |
+          ./Build.ps1
+          ./Test.ps1
+      - name: Upload unsigned signing input
+        id: unsigned
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ResMode-signing-input
+          path: dist/ResMode.exe
+          if-no-files-found: error
+      - name: Submit for manual SignPath approval
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: signed
+      - name: Validate signature and package
+        run: |
+          $exe = Join-Path $PWD 'signed/ResMode.exe'
+          $signature = Get-AuthenticodeSignature -LiteralPath $exe
+          if ($signature.Status -ne 'Valid') { throw 'Signed output does not have a trusted Authenticode signature.' }
+          if ($signature.SignerCertificate.Subject -notmatch 'SignPath Foundation') { throw 'Unexpected signing identity.' }
+          Copy-Item -LiteralPath $exe -Destination dist/ResMode.exe -Force
+          ./Package.ps1 -ArchivePath (Join-Path $PWD 'releases/ResMode-0.1.0-alpha.1-win-x64-signed.zip')
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: ResMode-signed-win-x64
+          path: releases/*-signed.zip
+          if-no-files-found: error

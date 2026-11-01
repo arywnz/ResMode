@@ -1,0 +1,32 @@
+# Build output (the installer recreates it)
+dist/
+
+# Local test builds and rollback copies
+backups/
+
+# Private certificates, local signing results, user data and packages
+assinatura-local/
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+*.crt
+*.log
+*.dmp
+.env
+.env.*
+!.env.example
+.vs/
+.vscode/
+bin/
+obj/
+*.user
+*.suo
+releases/
+jogos.xml
+exclusoes.xml
+catalogo.xml
+restauracao.xml
+pastas-restauracao.xml
+*.zip
