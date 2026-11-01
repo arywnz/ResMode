@@ -70,7 +70,7 @@ jobs:
           if ($signature.Status -ne 'Valid') { throw 'Signed output does not have a trusted Authenticode signature.' }
           if ($signature.SignerCertificate.Subject -notmatch 'SignPath Foundation') { throw 'Unexpected signing identity.' }
           Copy-Item -LiteralPath $exe -Destination dist/ResMode.exe -Force
-          ./Package.ps1 -ArchivePath (Join-Path $PWD 'releases/ResMode-0.2.0-alpha.1-win-x64-signed.zip')
+          ./Package.ps1 -ArchivePath (Join-Path $PWD 'releases/ResMode-0.2.1-alpha.1-win-x64-signed.zip')
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ResMode-signed-win-x64

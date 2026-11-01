@@ -30,22 +30,25 @@ public static class FeatureChecks {
             int a=TextRenderer.MeasureText("111111",mono,Size.Empty,TextFormatFlags.NoPadding).Width,b=TextRenderer.MeasureText("888888",mono,Size.Empty,TextFormatFlags.NoPadding).Width;Check(a==b,"Fonte técnica não é monoespaçada.");
             results.Add("PASS: Geist Sans/Medium/SemiBold e Geist Mono incorporadas; GDI confirmou Geist e números monoespaçados.");
         }
-        var glowMethod=typeof(Artwork).GetMethod("MakeGlow",BindingFlags.NonPublic|BindingFlags.Static);var tintMethod=typeof(Artwork).GetMethod("Tint",BindingFlags.NonPublic|BindingFlags.Static);
+        var tintMethod=typeof(Artwork).GetMethod("Tint",BindingFlags.NonPublic|BindingFlags.Static);
         using(var green=new Bitmap(148,222)){
             using(var g=Graphics.FromImage(green))g.Clear(Color.Lime);
-            using(var glow=(Bitmap)glowMethod.Invoke(null,new object[]{new Size(148,222),green})){
-                bool found=false;for(int y=0;y<glow.Height;y++)for(int x=0;x<glow.Width;x++){var c=glow.GetPixel(x,y);if(c.A>10){found=true;Check(c.R==0&&c.B==0,"Halo introduziu cores inexistentes na capa.");}}
-                Check(found,"Halo não foi gerado.");
-            }
             var tint=(Color)tintMethod.Invoke(null,new object[]{green});Check(tint.R==0&&tint.G==255&&tint.B==0,"Cor dominante foi artificialmente alterada.");
         }
-        using(var split=new Bitmap(148,222)){
-            using(var g=Graphics.FromImage(split)){g.Clear(Color.Red);g.FillRectangle(Brushes.Blue,0,111,148,111);}
-            using(var glow=(Bitmap)glowMethod.Invoke(null,new object[]{new Size(148,222),split})){
-                int m=Artwork.GlowMargin;var top=glow.GetPixel(m+74,m-2);var bottom=glow.GetPixel(m+74,m+222+2);Check(top.R>top.B&&bottom.B>bottom.R,"Halo não acompanhou as cores locais das bordas.");
+        using(var grid=new Grid{Size=new Size(1120,650)}){
+            var size=(Size)typeof(GameGrid).GetProperty("Cover",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(grid,null);
+            using(var cover=new Bitmap(size.Width,size.Height)){
+                for(int y=0;y<cover.Height;y++)for(int x=0;x<cover.Width;x++)cover.SetPixel(x,y,(x+y)%2==0?Color.White:Color.Black);
+                var art=new Artwork.Art{Cover=cover,Tint=Color.Red};
+                var game=new LibraryGame{Key="fixture:sharp",Name="Sharp cover",Launcher=Launchers.Manual,Installed=true,Rules=new List<GameRule>()};
+                var tile=(Bitmap)typeof(GameGrid).GetMethod("HoverTile",BindingFlags.NonPublic|BindingFlags.Instance).Invoke(grid,new object[]{game,art,1f,false});
+                int m=Artwork.CardMargin;
+                foreach(var at in new[]{new Point(12,12),new Point(13,12),new Point(size.Width-14,size.Height-14)})Check(tile.GetPixel(m+at.X,m+at.Y).ToArgb()==cover.GetPixel(at.X,at.Y).ToArgb(),"Hover changed sharp cover pixels.");
+                var backdrop=tile.GetPixel(m-4,m+size.Height+25);Check(backdrop.A>=90&&backdrop.R>220&&backdrop.G==0&&backdrop.B==0,"Card background is missing, weak or unrelated to cover colour.");
+                Check(tile.GetPixel(0,0).A==0,"Blur spilled outside the bounded card background.");
             }
         }
-        results.Add("PASS: halo usa pixels reais, preserva uma cor pura e acompanha cores diferentes nas bordas superior/inferior.");
+        results.Add("PASS: visible cover-colour background behind the card, unchanged sharp cover pixels and no blurred halo outside its bounds.");
         using(var grid=new Grid{Size=new Size(1120,650)}){
             var games=Enumerable.Range(0,5).Select(i=>new LibraryGame{Key="fixture:"+i,Name="Fixture "+i,Launcher=Launchers.Manual,Installed=true,Rules=new List<GameRule>()}).ToList();grid.SetGames(games,false);
             var first=Card(grid,0);var last=Card(grid,4);grid.Pointer(new Point(first.X+30,first.Y+30));grid.Pointer(new Point(last.X+30,last.Y+30));

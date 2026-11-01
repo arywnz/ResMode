@@ -11,14 +11,14 @@ using System.Runtime.InteropServices;
 
 // Cover art from the local Steam library cache, or the game's own icon. Nothing is downloaded.
 public static class Artwork {
-    // Tint is sampled without HSL changes. Glow is a blurred copy of the cover's own pixels.
+    // The card background uses a representative colour from the original cover pixels.
     // LoadedTicks: when the art became available, so the grid can fade it in instead of popping.
     // Cover comes with its rounded corners already cut (premultiplied alpha), so the grid copies it as is
-    // every frame, without clipping or resampling. Glow is the hover halo, rendered once in the cover's tint.
-    public class Art { public Image Cover; public Image Icon; public Image Glow; public Color Tint = Theme.Accent; public long LoadedTicks = DateTime.UtcNow.Ticks; }
+    // every frame, without clipping, hover filters or resampling.
+    public class Art { public Image Cover; public Image Icon; public Color Tint = Theme.Accent; public long LoadedTicks = DateTime.UtcNow.Ticks; }
 
     public static int Radius { get { return Theme.S(10); } }
-    public static int GlowMargin { get { return Theme.S(22); } }
+    public static int CardMargin { get { return Theme.S(8); } }
 
     static readonly Dictionary<string, Art> cache = new Dictionary<string, Art>();
     static string libraryCache;
@@ -48,7 +48,6 @@ public static class Artwork {
             foreach (var a in cache.Values) {
                 if (a.Cover != null) a.Cover.Dispose();
                 if (a.Icon != null) a.Icon.Dispose();
-                if (a.Glow != null) a.Glow.Dispose();
             }
             cache.Clear();
         }
@@ -69,7 +68,6 @@ public static class Artwork {
                     }
                     var source = art.Cover ?? art.Icon;
                     if (source != null) art.Tint = Tint(source);
-                    if (source != null) art.Glow = MakeGlow(cover, source);
                 } catch { }
                 art.LoadedTicks = DateTime.UtcNow.Ticks;
                 lock (cache) cache[g.Key] = art;
@@ -111,7 +109,7 @@ public static class Artwork {
                     if(!buckets.TryGetValue(key,out group))buckets[key]=group=new List<Color>();group.Add(c);
                 }
             if(buckets.Count==0)return Theme.Muted;
-            var dominant=buckets.Values.OrderByDescending(group=>group.Count*(.5+group.Average(c=>c.GetSaturation()))).First();
+            var dominant=buckets.Values.OrderByDescending(group=>Math.Pow(group.Count,.65)*(.2+group.Average(c=>c.GetSaturation()))*(.25+Math.Sqrt(group.Average(c=>c.GetBrightness())))).First();
             return Color.FromArgb((int)dominant.Average(c=>c.R),(int)dominant.Average(c=>c.G),(int)dominant.Average(c=>c.B));
         } finally {if(owns)pixels.Dispose();}
     }
@@ -138,33 +136,12 @@ public static class Artwork {
         }
     }
 
-    // Diffuse the artwork itself: different edges retain their different cover colours.
-    static Image MakeGlow(Size cover, Image source) {
-        int m = GlowMargin;
-        var bmp = new Bitmap(cover.Width + m * 2, cover.Height + m * 2, System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-        using (var g = Graphics.FromImage(bmp)) {
-            g.InterpolationMode=InterpolationMode.HighQualityBilinear;
-            float grow=Theme.S(8);
-            g.DrawImage(source,new RectangleF(m-grow,m-grow+Theme.S(3),cover.Width+grow*2,cover.Height+grow*2));
-        }
-        var area=new Rectangle(0,0,bmp.Width,bmp.Height);var bits=bmp.LockBits(area,ImageLockMode.ReadWrite,PixelFormat.Format32bppPArgb);
-        try{
-            int width=bmp.Width,height=bmp.Height;var pixels=new byte[width*height*4];Marshal.Copy(bits.Scan0,pixels,0,pixels.Length);
-            for(int pass=0;pass<3;pass++){pixels=Blur(pixels,width,height,Theme.S(6),true);pixels=Blur(pixels,width,height,Theme.S(6),false);}
-            for(int i=0;i<pixels.Length;i++)pixels[i]=(byte)(pixels[i]*.65f);
-            Marshal.Copy(pixels,0,bits.Scan0,pixels.Length);
-        }finally{bmp.UnlockBits(bits);}
-        return bmp;
-    }
-    static byte[] Blur(byte[] source,int width,int height,int radius,bool horizontal){
-        var output=new byte[source.Length];int lines=horizontal?height:width,length=horizontal?width:height;
-        for(int line=0;line<lines;line++)for(int channel=0;channel<4;channel++){
-            int sum=0;
-            for(int at=-radius;at<length;at++){
-                int add=at+radius;if(add<length)sum+=source[((horizontal?line*width+add:add*width+line)*4)+channel];
-                int remove=at-radius-1;if(remove>=0)sum-=source[((horizontal?line*width+remove:remove*width+line)*4)+channel];
-                if(at>=0){int count=Math.Min(length-1,at+radius)-Math.Max(0,at-radius)+1;output[((horizontal?line*width+at:at*width+line)*4)+channel]=(byte)(sum/count);}
-            }
-        }return output;
+    // A bounded coloured surface behind cover + label. No cover bitmap is blurred or tinted.
+    public static void DrawCardBackground(Graphics g,Rectangle card,Color tint,float amount){
+        amount=Math.Max(0,Math.Min(1,amount));if(amount<=0)return;
+        var frame=Rectangle.Inflate(card,Theme.S(6),Theme.S(6));
+        using(var path=Theme.Round(frame,Radius+Theme.S(4)))
+        using(var fill=new LinearGradientBrush(frame,Color.FromArgb((int)(165*amount),tint),Color.FromArgb((int)(110*amount),tint),90f))
+        using(var edge=new Pen(Color.FromArgb((int)(115*amount),tint),Theme.S(1))){g.FillPath(fill,path);g.DrawPath(edge,path);}
     }
 }
