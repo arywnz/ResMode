@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="ResMode" Manufacturer="ResMode contributors" Version="0.2.0" Language="1046" Codepage="1252"
+  <Package Name="ResMode" Manufacturer="ResMode contributors" Version="0.2.1" Language="1046" Codepage="1252"
            UpgradeCode="BFAD72D0-1633-46C5-A330-7308E1FC9B6C" Scope="perUser" InstallerVersion="500">
     <MajorUpgrade DowngradeErrorMessage="Uma versão mais recente do ResMode já está instalada." Schedule="afterInstallInitialize" />
     <MediaTemplate EmbedCab="yes" />
