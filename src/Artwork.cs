@@ -141,7 +141,7 @@ public static class Artwork {
         amount=Math.Max(0,Math.Min(1,amount));if(amount<=0)return;
         var frame=Rectangle.Inflate(card,Theme.S(6),Theme.S(6));
         using(var path=Theme.Round(frame,Radius+Theme.S(4)))
-        using(var fill=new LinearGradientBrush(frame,Color.FromArgb((int)(165*amount),tint),Color.FromArgb((int)(110*amount),tint),90f))
+        using(var fill=new LinearGradientBrush(frame,Color.FromArgb((int)(155*amount),tint),Color.FromArgb((int)(85*amount),tint),90f))
         using(var edge=new Pen(Color.FromArgb((int)(115*amount),tint),Theme.S(1))){g.FillPath(fill,path);g.DrawPath(edge,path);}
     }
 }
