@@ -507,7 +507,7 @@ public class GameGrid : ScrollSurface {
     public static Size Cover { get { return new Size(Theme.S(148), Theme.S(222)); } }
     int Gap { get { return Theme.S(18); } }
     int CardH { get { return Cover.Height + Theme.S(54); } }
-    // Room around the grid for the hover lift and glow, which reach past the card.
+    // Room around the grid for the bounded card background.
     int Edge { get { return Theme.S(12); } }
     int Columns { get { return Math.Max(1, (Width - Theme.S(10) - Edge + Gap) / (Cover.Width + Gap)); } }
 

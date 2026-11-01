@@ -36,7 +36,7 @@ public static class FeatureChecks {
             var tint=(Color)tintMethod.Invoke(null,new object[]{green});Check(tint.R==0&&tint.G==255&&tint.B==0,"Cor dominante foi artificialmente alterada.");
         }
         using(var grid=new Grid{Size=new Size(1120,650)}){
-            var size=(Size)typeof(GameGrid).GetProperty("Cover",BindingFlags.NonPublic|BindingFlags.Instance).GetValue(grid,null);
+            var size=GameGrid.Cover;
             using(var cover=new Bitmap(size.Width,size.Height)){
                 for(int y=0;y<cover.Height;y++)for(int x=0;x<cover.Width;x++)cover.SetPixel(x,y,(x+y)%2==0?Color.White:Color.Black);
                 var art=new Artwork.Art{Cover=cover,Tint=Color.Red};
