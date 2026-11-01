@@ -24,8 +24,23 @@ public static class GameFinder {
         { "bink2w64.dll", "Bink" }, { "binkw64.dll", "Bink" }, { "bink2w32.dll", "Bink" }, { "binkw32.dll", "Bink" },
         { "fmod.dll", "FMOD" }, { "fmodstudio.dll", "FMOD" }, { "fmodex64.dll", "FMOD" },
         { "PhysX3_x64.dll", "PhysX" }, { "PhysX_64.dll", "PhysX" }, { "discord_game_sdk.dll", "Discord SDK" },
-        { "data.win", "GameMaker" }
+        { "data.win", "GameMaker" },
+        { "steam_appid.txt", "Steam" }, { "UnityCrashHandler64.exe", "Unity" }, { "UnityCrashHandler32.exe", "Unity" },
+        { "CrySystem.dll", "CryEngine" }, { "tier0.dll", "Source" }, { "MonoGame.Framework.dll", "MonoGame" }, { "FNA.dll", "FNA" },
+        { "OpenAL32.dll", "OpenAL" }, { "UE4PrereqSetup_x64.exe", "Unreal" }, { "UEPrereqSetup_x64.exe", "Unreal" },
+        { "Game.rgss3a", "RPG Maker" }, { "nw.pak", "RPG Maker" }, { "AkSoundEngine.dll", "Wwise" }
     };
+
+    // A folder of games: each subfolder with a real executable counts as a game even without an engine fingerprint.
+    static readonly HashSet<string> GamesFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
+        "games", "game", "jogos", "jogo", "meus jogos", "my games", "pc games", "jogos pc", "repack", "repacks", "gog games", "steam games"
+    };
+    const long MinLooseExe = 3L * 1024 * 1024;
+
+    // Epic's launcher and its Online Services overlay look like games to a fingerprint search.
+    static readonly System.Text.RegularExpressions.Regex ToolFolder = new System.Text.RegularExpressions.Regex(
+        @"(?i)(epic online services|eos ?overlay|epicgameslauncher|epicwebhelper|unrealcefsubprocess|epic games\\launcher)");
+    public static bool IsToolPath(string path) { return ToolFolder.IsMatch(path ?? ""); }
 
     // Folder names that wrap the real game root (Binaries\Win64, bin\x64...).
     static readonly HashSet<string> BinFolders = new HashSet<string>(StringComparer.OrdinalIgnoreCase) {
@@ -41,7 +56,7 @@ public static class GameFinder {
     };
 
     // Publishers whose executables are never games, even if a game file sits next to them.
-    static readonly string[] NonGamePublishers = { "Microsoft", "Google", "Mozilla", "NVIDIA", "Advanced Micro Devices", "Intel", "Adobe", "Oracle", "Discord", "Spotify", "Valve" };
+    static readonly string[] NonGamePublishers = { "Google", "Mozilla", "NVIDIA", "Advanced Micro Devices", "Intel", "Adobe", "Oracle", "Discord", "Spotify", "Valve" }; // Microsoft and Epic are handled in IsOtherPublisher
 
     // Store clients and their helpers ship game SDKs too; they are never games themselves.
     static readonly System.Text.RegularExpressions.Regex LauncherName = new System.Text.RegularExpressions.Regex(
@@ -97,7 +112,9 @@ public static class GameFinder {
             else if (name.EndsWith(".pck", StringComparison.OrdinalIgnoreCase) && marker == null) marker = "Godot";
             if (shipping) break;
         }
+        if (marker == null && GamesFolders.Contains(Path.GetFileName(Path.GetDirectoryName(dir) ?? ""))) marker = "Pasta de jogos";
         if (marker == null) return null;
+        if (IsToolPath(dir)) return null;
 
         // Climb out of Binaries\Win64-style folders to the folder that holds the whole game.
         string root = dir;
@@ -109,7 +126,10 @@ public static class GameFinder {
         if (!Catalog.IsSafeGameRoot(root)) root = dir;
         if (!Catalog.IsSafeGameRoot(root) || root.Split('\\').Any(part => LauncherFolder.IsMatch(part))) return null;
         var game = Build(root, known, 5, marker);
-        return game != null && game.Exes.Count > 0 ? game : null;
+        if (game == null || game.Exes.Count == 0) return null;
+        // Without an engine fingerprint, only a folder with a sizeable executable is taken for a game.
+        if (marker == "Pasta de jogos" && !game.Exes.Any(e => { try { return new FileInfo(e).Length >= MinLooseExe; } catch { return false; } })) return null;
+        return game;
     }
 
     // Collects a game's executables (helpers, tiny stubs, other publishers' tools and known exes left out).
@@ -124,7 +144,7 @@ public static class GameFinder {
                 foreach (var f in new DirectoryInfo(item.Item1).EnumerateFiles("*.exe")) {
                     // A folder holding a library game belongs to its launcher; leftover tools there are not a new game.
                     if (known(f.FullName)) return null;
-                    if (f.Length < 100 * 1024 || IsLauncherExe(f.FullName) || IsOtherPublisher(f.FullName)) continue;
+                    if (f.Length < 100 * 1024 || IsLauncherExe(f.FullName) || IsToolPath(f.FullName) || IsOtherPublisher(f.FullName)) continue;
                     exes.Add(f);
                 }
                 if (item.Item2 < depth)
@@ -140,7 +160,13 @@ public static class GameFinder {
 
     static bool IsOtherPublisher(string exe) {
         try {
-            string company = FileVersionInfo.GetVersionInfo(exe).CompanyName ?? "";
+            var info = FileVersionInfo.GetVersionInfo(exe);
+            string company = info.CompanyName ?? "", product = info.ProductName ?? "";
+            // Microsoft and Epic also publish games; only their system pieces and tools are left out.
+            if (company.StartsWith("Microsoft", StringComparison.OrdinalIgnoreCase))
+                return System.Text.RegularExpressions.Regex.IsMatch(product, @"(?i)windows|visual|\.net|directx|office|edge|onedrive|redistributable|runtime|framework|update|installer|webview|gameinput");
+            if (company.StartsWith("Epic Games", StringComparison.OrdinalIgnoreCase))
+                return System.Text.RegularExpressions.Regex.IsMatch(product, @"(?i)launcher|online services|helper|crash|portal|prereq|eos");
             return NonGamePublishers.Any(p => company.StartsWith(p, StringComparison.OrdinalIgnoreCase));
         } catch { return false; }
     }

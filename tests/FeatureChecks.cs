@@ -38,8 +38,25 @@ public static class FeatureChecks {
             Check(offer!=null&&offer.Version=="9.0.0"&&offer.CanDownload&&offer.Sha256==sum,"Não escolheu a versão mais nova publicada.");
             Check(Updater.Pick("["+release("v9.0.0","https://example.com/ResMode-9.0.0-win-x64.msi","sha256:"+sum)+"]").CanDownload==false,"Aceitou instalador fora do GitHub do projeto.");
             Check(Updater.Pick("["+release("v9.0.0",good,"md5:abc")+"]").CanDownload==false,"Aceitou instalador sem SHA-256.");
-            Check(Updater.Pick("["+release("v0.2.2-alpha.1",good,"sha256:"+sum)+"]")==null,"Ofereceu a própria versão instalada.");
+            Check(Updater.Pick("["+release("v"+AppInfo.Release,good,"sha256:"+sum)+"]")==null,"Ofereceu a própria versão instalada.");
             results.Add("PASS: Atualizador compara versões, ignora rascunhos e só aceita MSI do repositório com SHA-256.");
+        }
+        {
+            string root=Path.Combine(Path.GetTempPath(),"resmode-finder-"+Guid.NewGuid().ToString("N"));
+            Action<string,long> file=(p,size)=>{string full=Path.Combine(root,p);Directory.CreateDirectory(Path.GetDirectoryName(full));using(var f=File.Create(full))f.SetLength(size);};
+            try{
+                file(@"Epic Games\Launcher\Portal\Binaries\Win64\EpicGamesLauncher.exe",5000000);file(@"Epic Games\Launcher\Portal\Binaries\Win64\EOSSDK-Win64-Shipping.dll",300000);
+                file(@"Epic Games\Epic Online Services\EOSOverlay\EOSOverlayRenderer-Win64-Shipping.exe",5000000);file(@"Epic Games\Epic Online Services\EOSOverlay\EOSSDK-Win64-Shipping.dll",300000);
+                file(@"Jogos\Meu Jogo\MeuJogo.exe",4000000);file(@"Jogos\Ferramenta\ferramenta.exe",500000);
+                file(@"Outros\Cool Game\CoolGame.exe",300000);file(@"Outros\Cool Game\UnityPlayer.dll",300000);
+                file(@"Outros\Steam Dir\Game.exe",300000);file(@"Outros\Steam Dir\steam_appid.txt",10);
+                var found=GameFinder.FromPath(root,x=>false);
+                var names=found.Select(g=>Path.GetFileName(g.Folder)).ToList();
+                Check(!found.Any(g=>g.Folder.IndexOf("Epic",StringComparison.OrdinalIgnoreCase)>=0),"Achou o launcher ou os serviços da Epic como jogo: "+String.Join(", ",names));
+                Check(names.Contains("Meu Jogo")&&names.Contains("Cool Game")&&names.Contains("Steam Dir"),"Não achou os jogos esperados: "+String.Join(", ",names));
+                Check(!names.Contains("Ferramenta"),"Tomou um programa pequeno por jogo.");
+                results.Add("PASS: Busca ignora o launcher da Epic e acha jogos em pasta de jogos, Unity e steam_appid.txt.");
+            }finally{try{Directory.Delete(root,true);}catch{}}
         }
         var tintMethod=typeof(Artwork).GetMethod("Tint",BindingFlags.NonPublic|BindingFlags.Static);
         using(var green=new Bitmap(148,222)){

@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.1";
+    public const string Release = "0.2.2-alpha.2";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -29,6 +29,8 @@ public class Settings {
     // Competitive games stay at the desktop resolution unless the user turned them on (IncludedGames).
     public bool SkipCompetitive = true;
     public bool CompetitiveNotified = false;
+    // The first-run search for games outside the launchers has finished.
+    public bool FirstSearchDone = false;
     // History: "all", "games" (game sessions only) or "off"; errors are always kept.
     public string LogLevel = "all";
     // Looks for a newer GitHub release at startup and twice a day; AnnouncedUpdate keeps the tray balloon to once per version.
