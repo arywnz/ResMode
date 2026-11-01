@@ -575,7 +575,7 @@ public class AppContext : ApplicationContext {
         // No icon: Windows then shows only the app's own icon in the header, instead of a generic blue "i".
         string game = RunningNames.FirstOrDefault();
         tray.ShowBalloonTip(2500, (game ?? "Jogo") + " em " + after.width + " × " + after.height,
-            after.hz + " Hz. A tela volta para " + deskW + " × " + deskH + " quando o jogo fechar.", ToolTipIcon.None);
+            "No jogo, use " + after.width + " × " + after.height + " (em janela sem borda ocupa a tela toda). Volta para " + deskW + " × " + deskH + " ao fechar.", ToolTipIcon.None);
     }
 
     bool Restore() {

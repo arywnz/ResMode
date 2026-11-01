@@ -220,6 +220,7 @@ public class SettingsOverlay : Modal {
         var card = new InfoCard("Como funciona", Theme.S(400),
             new InfoCard.Block { Body = "O jogo é renderizado numa resolução maior que a do monitor e a placa de vídeo reduz a imagem para a tela. Fica mais nítido e com menos serrilhado, mas pesa como rodar naquela resolução de verdade." },
             new InfoCard.Block { Body = "A lista mostra só o que o driver oferece acima da resolução da tela. Depois de ativar algo novo, use o botão de atualizar ao lado da lista." },
+            new InfoCard.Block { Heading = "No jogo", Body = "Nas opções de vídeo do jogo, escolha a mesma resolução desta lista. Em \"janela sem borda\", o jogo desenha uma janela do tamanho que você escolheu; se for menor que a tela, ele aparece como janela em vez de ocupar tudo." },
             new InfoCard.Block { Heading = "NVIDIA", Dot = Color.FromArgb(118, 185, 0),
                 Body = "Painel de Controle NVIDIA › Gerenciar configurações 3D › DSR – Fatores. Os fatores DL (1,78× e 2,25×) usam um filtro de IA e chegam perto da nitidez do 4× com bem menos custo. Para uma resolução exata: Alterar resolução › Personalizar." },
             new InfoCard.Block { Heading = "AMD", Dot = Color.FromArgb(237, 28, 36),
