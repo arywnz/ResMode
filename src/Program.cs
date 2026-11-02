@@ -59,8 +59,12 @@ public static class Program {
                 Application.SetCompatibleTextRenderingDefault(false);
                 Application.Run(new AppContext(!background));
             } catch (Exception e) {
-                Store.Log(e.ToString(), LogKind.Error);
-                MessageBox.Show(e.Message, AppInfo.Name);
+                // Quit or update chosen from the tray menu: the menu was disposed while Windows was still closing it. Nothing to report.
+                var disposed = e as ObjectDisposedException;
+                if (disposed == null || disposed.ObjectName != "ToolStripDropDown") {
+                    Store.Log(e.ToString(), LogKind.Error);
+                    MessageBox.Show(e.Message, AppInfo.Name);
+                }
             } finally {
                 Store.Restore();
             }

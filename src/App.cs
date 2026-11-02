@@ -780,6 +780,7 @@ public class AppContext : ApplicationContext {
         if (dashboard != null) dashboard.Dispose();
         SystemEvents.SessionEnding -= SessionEnding;
         tray.Visible = false;
+        if (tray.ContextMenuStrip != null) tray.ContextMenuStrip.Close(); // so Windows is not still closing it when it is disposed
         tray.Dispose();
         base.ExitThreadCore();
     }
