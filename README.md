@@ -1,6 +1,6 @@
 # ResMode
 
-**"Você gastou uma fortuna na placa de vídeo pra ficar refém de um monitor 1080p de betinha."**
+**Você gastou uma fortuna na placa de vídeo pra ficar refém de um monitor 1080p de betinha.**
 
 O ResMode nasceu de um problema extremamente específico: querer jogar em uma resolução maior sem precisar transformar o desktop inteiro num experimento científico toda vez que abre um jogo.
 
