@@ -35,6 +35,17 @@ public static class GamePreferences {
         else cfg.IncludedGames.Add(key); // also overrides the competitive default
     }
 
+    public static GameMode ModeOf(Settings cfg, string key) {
+        return cfg.GameModes == null ? null : cfg.GameModes.FirstOrDefault(m => String.Equals(m.Key, key, StringComparison.OrdinalIgnoreCase));
+    }
+
+    // width < 0 removes the game's own choice (back to the general resolution).
+    public static void SetMode(Settings cfg, string key, int width, int height) {
+        if (cfg.GameModes == null) cfg.GameModes = new List<GameMode>();
+        cfg.GameModes.RemoveAll(m => String.Equals(m.Key, key, StringComparison.OrdinalIgnoreCase));
+        if (width >= 0) cfg.GameModes.Add(new GameMode { Key = key, Width = width, Height = height });
+    }
+
     public static List<LibraryGame> Groups(Settings cfg) {
         return cfg.Games.GroupBy(Key, StringComparer.OrdinalIgnoreCase).Select(g => new LibraryGame {
             Key = g.Key,

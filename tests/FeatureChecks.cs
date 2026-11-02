@@ -59,6 +59,18 @@ public static class FeatureChecks {
             results.Add("PASS: Busca ignora o launcher da Epic e acha jogos em pasta de jogos, Unity e steam_appid.txt.");
             }finally{try{Directory.Delete(root,true);}catch{}}
         }
+        {
+            var cfg=new Settings();
+            Check(GamePreferences.ModeOf(cfg,"steam:1")==null,"Jogo sem escolha própria devia usar a resolução geral.");
+            GamePreferences.SetMode(cfg,"steam:1",2880,1620);GamePreferences.SetMode(cfg,"steam:2",0,0);
+            var own=GamePreferences.ModeOf(cfg,"STEAM:1");var normal=GamePreferences.ModeOf(cfg,"steam:2");
+            Check(own!=null&&own.Width==2880&&own.Height==1620&&normal!=null&&normal.Width==0,"Resolução por jogo não foi guardada.");
+            GamePreferences.SetMode(cfg,"steam:1",3325,1871);
+            Check(cfg.GameModes.Count==2&&GamePreferences.ModeOf(cfg,"steam:1").Width==3325,"Trocar a resolução de um jogo duplicou a entrada.");
+            GamePreferences.SetMode(cfg,"steam:1",-1,0);
+            Check(GamePreferences.ModeOf(cfg,"steam:1")==null&&cfg.GameModes.Count==1,"Voltar ao padrão não removeu a escolha do jogo.");
+            results.Add("PASS: resolução por jogo (guardar, trocar, normal e voltar ao padrão).");
+        }
         var tintMethod=typeof(Artwork).GetMethod("Tint",BindingFlags.NonPublic|BindingFlags.Static);
         using(var green=new Bitmap(148,222)){
             using(var g=Graphics.FromImage(green))g.Clear(Color.Lime);
