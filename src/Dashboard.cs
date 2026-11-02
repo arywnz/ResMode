@@ -75,6 +75,9 @@ public class Dashboard : Form {
     readonly Label brand;
     readonly SearchBox search;
     readonly RefreshButton refreshButton;
+    readonly ModePill modePill = new ModePill();
+    readonly FlatButton sortButton;
+    readonly Panel hintBar;
     readonly FlatButton addButton, settingsButton;
     readonly BellButton bell;
     readonly Segments filter;
@@ -116,7 +119,7 @@ public class Dashboard : Form {
         settingsButton = new FlatButton { Glyph = Theme.IconSettings, Kind = ButtonKind.Quiet, Width = Theme.S(36) };
         new ToolTip().SetToolTip(settingsButton, "Configurações");
         settingsButton.Click += delegate { ShowModal(new SettingsOverlay(owner, WindowSnapshot)); };
-        topBar.Controls.AddRange(new Control[] { logo, brand, search, refreshButton, addButton, bell, settingsButton });
+        topBar.Controls.AddRange(new Control[] { logo, brand, modePill, search, refreshButton, addButton, bell, settingsButton });
         topBar.Layout += delegate { LayoutTopBar(); };
         topBar.Paint += (s, e) => { using (var p = new Pen(Theme.Border)) e.Graphics.DrawLine(p, 0, topBar.Height - 1, topBar.Width, topBar.Height - 1); };
 
@@ -124,16 +127,36 @@ public class Dashboard : Form {
         tabsRow = new Panel { Dock = DockStyle.Top, Height = Theme.S(70) };
         filter = new Segments();
         filter.Changed += delegate { ReloadGames(true); };
+        sortButton = new FlatButton { Kind = ButtonKind.Quiet, Text = "Ordem: Nome", Font = Theme.Body(10), Height = Theme.S(36) };
+        sortButton.Width = sortButton.PreferredWidth();
+        sortButton.Click += delegate { SortMenu(); };
         tabsRow.Controls.Add(filter);
-        tabsRow.Layout += delegate { filter.Location = new Point(Theme.S(28), Theme.S(20)); };
+        tabsRow.Controls.Add(sortButton);
+        tabsRow.Layout += delegate {
+            filter.Location = new Point(Theme.S(28), Theme.S(20));
+            sortButton.Location = new Point(Math.Max(filter.Right + Theme.S(12), tabsRow.Width - Theme.S(28) - sortButton.Width), Theme.S(20));
+        };
         var gridHolder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(Theme.S(16), 0, Theme.S(18), Theme.S(12)) };
         grid = new GameGrid { Dock = DockStyle.Fill, IsRunning = g => owner.RunningNames.Contains(g.Name) };
         grid.MenuRequested += GameMenu;
         grid.PlayRequested += Play;
         gridHolder.Controls.Add(grid);
 
+        // Shown while the driver offers no resolution above the desktop's, which is the usual first-run stumble.
+        hintBar = new Panel { Dock = DockStyle.Top, Height = Theme.S(52), BackColor = Theme.Mix(Theme.Surface, Theme.Warn, 0.10f), Visible = false };
+        var hintText = new Label { AutoSize = false, Text = "Seu monitor ainda não oferece uma resolução maior. Ative o DSR (NVIDIA) ou o VSR (AMD) no painel da placa de vídeo para o ResMode ter o que ligar nos jogos.", Font = Theme.Body(10), ForeColor = Theme.Text, BackColor = hintBar.BackColor, TextAlign = ContentAlignment.MiddleLeft };
+        var hintButton = new FlatButton { Text = "Como ativar", Kind = ButtonKind.Secondary };
+        hintButton.Width = hintButton.PreferredWidth();
+        hintButton.Click += delegate { ShowModal(new SettingsOverlay(owner, WindowSnapshot)); };
+        hintBar.Controls.AddRange(new Control[] { hintText, hintButton });
+        hintBar.Layout += delegate {
+            hintButton.Location = new Point(hintBar.Width - Theme.S(28) - hintButton.Width, (hintBar.Height - hintButton.Height) / 2);
+            hintText.SetBounds(Theme.S(28), 0, Math.Max(Theme.S(100), hintButton.Left - Theme.S(40)), hintBar.Height);
+        };
+
         Controls.Add(gridHolder);
         Controls.Add(tabsRow);
+        Controls.Add(hintBar);
         Controls.Add(topBar);
 
         refresh = new System.Windows.Forms.Timer { Interval = 1000 };
@@ -161,6 +184,9 @@ public class Dashboard : Form {
         if (!brand.Visible) left = logo.Right + Theme.S(16);
         search.Width = Math.Max(Theme.S(120), Math.Min(Theme.S(280), x - left - gap));
         search.Location = new Point(x - search.Width, cy - search.Height / 2);
+        // The game-mode pill takes the room left of the search box when there is some.
+        modePill.Location = new Point(search.Left - gap - modePill.Width, cy - modePill.Height / 2);
+        modePill.Visible = modePill.Shown && modePill.Left >= left;
     }
 
     protected override void OnHandleCreated(EventArgs e) {
@@ -290,9 +316,17 @@ public class Dashboard : Form {
         var tag = tabs[filter.Index].Tag;
 
         string q = search.Input.Text.Trim();
-        var shown = (Equals(tag, "removed") ? all.Where(g => g.Excluded) : active.Where(g => Equals(tag, "all") || g.Launcher == tag))
-            .Where(g => q == "" || g.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0)
-            .OrderBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var found = (Equals(tag, "removed") ? all.Where(g => g.Excluded) : active.Where(g => Equals(tag, "all") || g.Launcher == tag))
+            .Where(g => q == "" || g.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0);
+        string sort = owner.Configuration.SortMode;
+        IOrderedEnumerable<LibraryGame> ordered;
+        if (sort == "played") ordered = found.OrderByDescending(g => Playtime.Get(g.Key).Total);
+        else if (sort == "recent") ordered = found.OrderByDescending(g => Playtime.Get(g.Key).Last ?? DateTime.MinValue);
+        else ordered = found.OrderBy(g => 0);
+        var shown = ordered.ThenBy(g => g.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        sortButton.Text = "Ordem: " + (sort == "played" ? "Mais jogados" : sort == "recent" ? "Recentes" : "Nome");
+        sortButton.Width = sortButton.PreferredWidth();
+        tabsRow.PerformLayout();
         grid.EmptyText = q != "" ? "Nenhum jogo com \"" + q + "\"." : "Nenhum jogo encontrado.";
         grid.SetGames(shown, animate);
         Artwork.Load(all, GameGrid.Cover, () => { if (IsHandleCreated && !IsDisposed) BeginInvoke(new Action(grid.Invalidate)); });
@@ -300,14 +334,43 @@ public class Dashboard : Form {
 
     // Popover beside the clicked card (never on top of it, so a second click on the card still starts the game).
     void GameMenu(LibraryGame g, Rectangle card) {
-        var panel = new GamePanel(g, owner.RunningNames.Contains(g.Name));
+        var panel = new GamePanel(g, owner.RunningNames.Contains(g.Name), owner.GameModeText(g.Key));
         var drop = Theme.RoundedDrop();
-        drop.Items.Add(new ToolStripControlHost(panel) { Padding = Padding.Empty, Margin = Padding.Empty, AutoSize = false, Size = panel.Size });
+        // The panel sits in a host so a resolution list can open beside it without closing it.
+        var host = new Panel { BackColor = Theme.Raised, Size = panel.Size };
+        host.Controls.Add(panel);
+        var hostItem = new ToolStripControlHost(host) { Padding = Padding.Empty, Margin = Padding.Empty, AutoSize = false, Size = panel.Size };
+        drop.Items.Add(hostItem);
         drop.Opening += delegate { drop.Opacity = 0; Motion.Run(Tuple.Create(drop, "fade"), Motion.Fast, e => { if (!drop.IsDisposed) drop.Opacity = e; }); };
         drop.Closed += delegate { if (!IsDisposed && IsHandleCreated) BeginInvoke(new Action(drop.Dispose)); else drop.Dispose(); };
 
         panel.Play.Click += delegate { drop.Close(); Play(g, new Point(card.Right, card.Top + Theme.S(24))); };
         panel.Toggle.Click += delegate { drop.Close(); Act(() => owner.SetGameExcluded(g.Key, !g.Excluded)); };
+        ResolutionPanel side = null;
+        bool sideOnLeft = false;
+        panel.Mode.Click += delegate {
+            if (side != null) { // second click folds the list away again
+                host.Controls.Remove(side);
+                side.Dispose();
+                side = null;
+                panel.Left = 0;
+                if (sideOnLeft) drop.Left += host.Width - panel.Width;
+                host.Width = panel.Width;
+                hostItem.Size = host.Size;
+                drop.Size = new Size(host.Width + 2, host.Height + 2);
+                return;
+            }
+            side = BuildResolutionPanel(g, panel);
+            side.Height = panel.Height;
+            var work2 = Screen.FromControl(grid).WorkingArea;
+            sideOnLeft = drop.Right + side.Width > work2.Right;
+            host.Width = panel.Width + side.Width;
+            hostItem.Size = host.Size;
+            drop.Size = new Size(host.Width + 2, host.Height + 2);
+            if (sideOnLeft) { side.Left = 0; panel.Left = side.Width; drop.Left -= side.Width; }
+            else { panel.Left = 0; side.Left = panel.Width; }
+            host.Controls.Add(side);
+        };
         string exe = g.Rules.Select(r => r.Exe).FirstOrDefault(File.Exists);
         panel.Folder.Enabled = exe != null;
         panel.Folder.Click += delegate {
@@ -328,6 +391,39 @@ public class Dashboard : Form {
         panel.Play.Focus();
     }
 
+    void SortMenu() {
+        var menu = Theme.Menu();
+        string current = owner.Configuration.SortMode;
+        foreach (var option in new[] { Tuple.Create("name", "Nome"), Tuple.Create("played", "Mais jogados"), Tuple.Create("recent", "Jogados recentemente") }) {
+            string key = option.Item1;
+            var entry = new ToolStripMenuItem(((current ?? "name") == key ? "●  " : "     ") + option.Item2);
+            entry.Click += delegate { Act(() => owner.SetSortMode(key)); };
+            menu.Items.Add(entry);
+        }
+        Theme.ShowMenu(menu, tabsRow, new Point(sortButton.Left, sortButton.Bottom + Theme.S(4)));
+    }
+
+    // This game's own resolution: the general one, none (normal), or any of the larger modes the driver offers.
+    ResolutionPanel BuildResolutionPanel(LibraryGame g, GamePanel panel) {
+        var cfg = owner.Configuration;
+        var current = GamePreferences.ModeOf(cfg, g.Key);
+        var choices = new List<ResolutionPanel.Choice> {
+            new ResolutionPanel.Choice { Text = cfg.Width > 0 ? "PadrÃ£o (" + cfg.Width + " Ã— " + cfg.Height + ")" : "PadrÃ£o", Width = -1 },
+            new ResolutionPanel.Choice { Text = "Normal (nÃ£o trocar)", Width = 0 }
+        };
+        try {
+            foreach (var m in Native.LargerModes(owner.DisplayDevice, cfg.DesktopWidth, cfg.DesktopHeight))
+                choices.Add(new ResolutionPanel.Choice { Text = m.width + " Ã— " + m.height, Width = m.width, Height = m.height });
+        } catch { }
+        int selected = 0;
+        if (current != null) selected = Math.Max(0, choices.FindIndex(c => c.Width == current.Width && c.Height == current.Height));
+        var side = new ResolutionPanel("ResoluÃ§Ã£o neste jogo", choices, selected);
+        side.Picked += choice => {
+            Act(() => owner.SetGameMode(g.Key, choice.Width, choice.Height));
+            panel.Mode.Text = "ResoluÃ§Ã£o: " + owner.GameModeText(g.Key);
+        };
+        return side;
+    }
     // Steam starts its own games; otherwise the game's exe, asking which one when it has several.
     void Play(LibraryGame g, Point at) {
         if (owner.RunningNames.Contains(g.Name)) return;
@@ -352,6 +448,8 @@ public class Dashboard : Form {
         // Background scans (a game just installed, for example) also spin the refresh icon.
         if (owner.CatalogBusy && !refreshButton.Spinning) refreshButton.Start(() => owner.CatalogPending);
         if (bell.Unread != owner.Unread) { bell.Unread = owner.Unread; bell.Invalidate(); }
+        modePill.SetState(owner.DisplayActive, owner.DisplayActive ? owner.CurrentMode : "");
+        hintBar.Visible = owner.Configuration.Width == 0 && owner.Configuration.Games.Count > 0;
     }
 
     void Act(Action action) {

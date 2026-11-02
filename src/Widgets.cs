@@ -362,13 +362,13 @@ public class PlayButton : FlatButton {
 // a large "Jogar", then the quieter actions.
 public class GamePanel : Painted {
     public readonly PlayButton Play;
-    public readonly FlatButton Toggle, Folder;
+    public readonly FlatButton Toggle, Folder, Mode;
     readonly LibraryGame game;
     readonly Playtime.Info time;
     Rectangle Thumb { get { return new Rectangle(Theme.S(18), Theme.S(18), Theme.S(64), Theme.S(96)); } }
     Rectangle Stats { get { return new Rectangle(Theme.S(18), Thumb.Bottom + Theme.S(16), Width - Theme.S(36), Theme.S(58)); } }
 
-    public GamePanel(LibraryGame game, bool running) {
+    public GamePanel(LibraryGame game, bool running, string modeText) {
         this.game = game;
         time = Playtime.Get(game.Key);
         BackColor = Theme.Raised;
@@ -376,12 +376,14 @@ public class GamePanel : Painted {
         Play = new PlayButton { Kind = ButtonKind.Primary, Live = running, Text = running ? "Em jogo" : game.Installed ? "Jogar" : "Não encontrado", Enabled = game.Installed && !running };
         Toggle = new FlatButton { Kind = ButtonKind.Quiet, AlignLeft = true, Height = Theme.S(38), Font = Theme.Body(10.5f),
             Glyph = game.Excluded ? Theme.IconCheck : Theme.IconPause, Text = game.Excluded ? "Usar resolução de jogo" : "Ignorar este jogo" };
+        Mode = new FlatButton { Kind = ButtonKind.Quiet, AlignLeft = true, Height = Theme.S(38), Font = Theme.Body(10.5f), Glyph = Theme.IconRefresh, Text = "Resolução: " + modeText };
         Folder = new FlatButton { Kind = ButtonKind.Quiet, AlignLeft = true, Height = Theme.S(38), Font = Theme.Body(10.5f), Glyph = Theme.IconFolder, Text = "Abrir pasta" };
         Play.SetBounds(Theme.S(18), Stats.Bottom + Theme.S(14), Width - Theme.S(36), Play.Height);
         Toggle.SetBounds(Theme.S(8), Play.Bottom + Theme.S(17), Width - Theme.S(16), Toggle.Height);
-        Folder.SetBounds(Theme.S(8), Toggle.Bottom + Theme.S(2), Width - Theme.S(16), Folder.Height);
+        Mode.SetBounds(Theme.S(8), Toggle.Bottom + Theme.S(2), Width - Theme.S(16), Mode.Height);
+        Folder.SetBounds(Theme.S(8), Mode.Bottom + Theme.S(2), Width - Theme.S(16), Folder.Height);
         Height = Folder.Bottom + Theme.S(10);
-        Controls.AddRange(new Control[] { Play, Toggle, Folder });
+        Controls.AddRange(new Control[] { Play, Toggle, Mode, Folder });
     }
 
     protected override void OnPaint(PaintEventArgs e) {
@@ -476,5 +478,96 @@ public class InfoCard : Painted {
         e.Graphics.Clear(BackColor);
         Theme.Smooth(e.Graphics);
         Measure(e.Graphics);
+    }
+}
+
+// Shown in the top bar while a game resolution is on: a green dot and the mode the screen is in right now.
+public class ModePill : Painted {
+    string text = "";
+    public bool Shown { get; private set; }
+    public ModePill() {
+        Visible = false;
+        Height = Theme.S(30);
+        Font = Theme.Body(10, true);
+    }
+
+    public void SetState(bool on, string mode) {
+        string next = on ? "Em jogo · " + mode : "";
+        if (next == text && Shown == on) return;
+        text = next;
+        Shown = on;
+        if (on) Width = TextRenderer.MeasureText(text, Font, Size.Empty, TextFormatFlags.NoPadding).Width + Theme.S(40);
+        Invalidate();
+        if (Parent != null) Parent.PerformLayout();
+    }
+
+    protected override void OnPaint(PaintEventArgs e) {
+        var g = e.Graphics;
+        g.Clear(ParentColor);
+        Theme.Smooth(g);
+        var r = new Rectangle(0, 0, Width - 1, Height - 1);
+        Theme.Fill(g, r, Height / 2, Theme.Mix(Theme.Surface, Theme.Live, 0.12f));
+        int dot = Theme.S(8);
+        using (var b = new SolidBrush(Theme.Live)) g.FillEllipse(b, Theme.S(14), (Height - dot) / 2f, dot, dot);
+        TextRenderer.DrawText(g, text, Font, new Rectangle(Theme.S(28), 0, Width - Theme.S(34), Height), Theme.Text, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+    }
+}
+
+// The per-game resolution list that opens beside a game's panel: one row per choice, the current one marked.
+public class ResolutionPanel : Painted {
+    public class Choice { public string Text; public int Width, Height; }
+    readonly string title;
+    public readonly List<Choice> Choices;
+    int selected, hot = -1;
+    public event Action<Choice> Picked;
+    int RowH { get { return Theme.S(38); } }
+    int Top0 { get { return Theme.S(52); } }
+
+    public ResolutionPanel(string title, List<Choice> choices, int selected) {
+        this.title = title;
+        Choices = choices;
+        this.selected = selected;
+        BackColor = Theme.Raised;
+        Width = Theme.S(250);
+        Height = Top0 + choices.Count * RowH + Theme.S(12);
+        Cursor = Cursors.Default;
+    }
+
+    public void Select(int index) { selected = index; Invalidate(); }
+
+    Rectangle Row(int i) { return new Rectangle(Theme.S(8), Top0 + i * RowH, Width - Theme.S(16), RowH - Theme.S(2)); }
+
+    protected override void OnMouseMove(MouseEventArgs e) {
+        int h = -1;
+        for (int i = 0; i < Choices.Count; i++) if (Row(i).Contains(e.Location)) h = i;
+        if (h != hot) { hot = h; Cursor = h >= 0 ? Cursors.Hand : Cursors.Default; Invalidate(); }
+        base.OnMouseMove(e);
+    }
+
+    protected override void OnMouseLeave(EventArgs e) { hot = -1; Invalidate(); base.OnMouseLeave(e); }
+
+    protected override void OnMouseClick(MouseEventArgs e) {
+        for (int i = 0; i < Choices.Count; i++)
+            if (Row(i).Contains(e.Location)) { selected = i; Invalidate(); if (Picked != null) Picked(Choices[i]); break; }
+        base.OnMouseClick(e);
+    }
+
+    protected override void OnPaint(PaintEventArgs e) {
+        var g = e.Graphics;
+        g.Clear(BackColor);
+        Theme.Smooth(g);
+        using (var head = Theme.Body(12, true)) TextRenderer.DrawText(g, title, head, new Point(Theme.S(18), Theme.S(18)), Theme.Text, TextFormatFlags.NoPadding);
+        using (var p = new Pen(Theme.Border)) g.DrawLine(p, Theme.S(8), Top0 - Theme.S(6), Width - Theme.S(8), Top0 - Theme.S(6));
+        using (var font = Theme.Body(10.5f)) using (var mono = Theme.Mono(10.5f))
+            for (int i = 0; i < Choices.Count; i++) {
+                var r = Row(i);
+                if (i == hot) Theme.Fill(g, r, Theme.S(8), Theme.Mix(Theme.Raised, Color.White, 0.06f));
+                int d = Theme.S(14), cx = r.X + Theme.S(12), cy = r.Y + (r.Height - d) / 2;
+                using (var pen = new Pen(i == selected ? Theme.Accent : Theme.Faint, Theme.S(1.6f))) g.DrawEllipse(pen, cx, cy, d, d);
+                if (i == selected) using (var b = new SolidBrush(Theme.Accent)) g.FillEllipse(b, cx + Theme.S(4), cy + Theme.S(4), d - Theme.S(8), d - Theme.S(8));
+                bool technical = Choices[i].Width > 0;
+                TextRenderer.DrawText(g, Choices[i].Text, technical ? mono : font, new Rectangle(cx + d + Theme.S(12), r.Y, r.Right - cx - d - Theme.S(18), r.Height), i == selected ? Theme.Text : Theme.Muted,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPadding);
+            }
     }
 }

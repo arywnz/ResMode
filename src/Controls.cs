@@ -710,22 +710,27 @@ public class GameGrid : ScrollSurface {
 
     readonly Dictionary<string, Bitmap> labels = new Dictionary<string, Bitmap>();
 
-    // Name plus launcher line, rendered once per game into a transparent bitmap.
+    // Name plus launcher line, rendered once per game.
     Bitmap Label(LibraryGame game) {
-        string key = game.Key + "|" + game.Excluded + "|" + game.Competitive + "|" + Cover.Width;
+        var total = Playtime.Get(game.Key).Total;
+        string key = game.Key + "|" + game.Excluded + "|" + game.Competitive + "|" + Cover.Width + "|" + (int)total.TotalMinutes;
         Bitmap bmp;
         if (labels.TryGetValue(key, out bmp)) return bmp;
-        bmp = new Bitmap(Cover.Width, Theme.S(46), System.Drawing.Imaging.PixelFormat.Format32bppPArgb);
-        using (var g = Graphics.FromImage(bmp)) using (var nameFont = Theme.Body(10.5f, true)) using (var small = Theme.Body(9.5f))
-        using (var format = new StringFormat(StringFormatFlags.NoWrap) { Trimming = StringTrimming.EllipsisCharacter, LineAlignment = StringAlignment.Center }) {
-            // No grid fitting: it snaps Geist's curves to whole pixels, which reads as pixelated at these sizes.
-            g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
-            g.InterpolationMode = InterpolationMode.HighQualityBicubic;
-            using (var b = new SolidBrush(game.Excluded ? Theme.Muted : Theme.Text)) g.DrawString(game.Name, nameFont, b, new RectangleF(-Theme.S(1), 0, bmp.Width + Theme.S(1), Theme.S(22)), format);
-            float lx = 0;
+        // Opaque, on the window's own colour, so GDI can use ClearType: the same crisp text as the rest of the app.
+        // (Drawn with GDI+ greyscale smoothing it came out soft.)
+        bmp = new Bitmap(Cover.Width, Theme.S(46), System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+        using (var g = Graphics.FromImage(bmp)) using (var nameFont = Theme.Body(10.5f, true)) using (var small = Theme.Body(9.5f)) {
+            g.Clear(Theme.Base);
+            var line = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding;
+            TextRenderer.DrawText(g, game.Name, nameFont, new Rectangle(0, 0, bmp.Width, Theme.S(22)), game.Excluded ? Theme.Muted : Theme.Text, line);
+            int lx = 0;
             var icon = game.Launcher.Icon;
-            if (icon != null) { g.DrawImage(icon, 0, Theme.S(26), Theme.S(14), Theme.S(14)); lx = Theme.S(20); }
-            using (var b = new SolidBrush(Theme.Muted)) g.DrawString(game.Excluded && game.Competitive ? "Competitivo" : game.Launcher.Name, small, b, new RectangleF(lx - Theme.S(1), Theme.S(24), bmp.Width - lx, Theme.S(18)), format);
+            if (icon != null) { g.InterpolationMode = InterpolationMode.HighQualityBicubic; g.DrawImage(icon, 0, Theme.S(26), Theme.S(14), Theme.S(14)); lx = Theme.S(20); }
+            TextRenderer.DrawText(g, game.Excluded && game.Competitive ? "Competitivo" : game.Launcher.Name, small, new Rectangle(lx, Theme.S(24), bmp.Width - lx, Theme.S(18)), Theme.Muted, line);
+            // Time played, right-aligned on the same line (only once there is a minute of it).
+            if (total.TotalMinutes >= 1)
+                TextRenderer.DrawText(g, Playtime.FormatTotal(total), small, new Rectangle(0, Theme.S(24), bmp.Width, Theme.S(18)), Theme.Faint,
+                    TextFormatFlags.Right | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);
         }
         if (labels.Count > 400) { foreach (var old in labels.Values) old.Dispose(); labels.Clear(); }
         labels[key] = bmp;

@@ -13,10 +13,11 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.16";
+    public const string Release = "0.2.2-alpha.17";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
+public class GameMode { public string Key; public int Width, Height; }
 
 public class Settings {
     // 0 = not chosen yet; picked on first run from what this PC's driver offers.
@@ -41,6 +42,10 @@ public class Settings {
     public List<string> IncludedGames = new List<string>();
     public List<string> ExcludedGames = new List<string>();
     public List<GameRule> Games = new List<GameRule>();
+    // Per-game resolution: Width 0 keeps that game at the normal resolution; no entry means the general one.
+    public List<GameMode> GameModes = new List<GameMode>();
+    // Order of the library: "name", "played" (most time first) or "recent".
+    public string SortMode = "name";
 }
 
 // Where another monitor sits on the desktop (in each monitor's own pixels), kept so it can go back after the game.

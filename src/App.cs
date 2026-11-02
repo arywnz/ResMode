@@ -186,7 +186,9 @@ public class AppContext : ApplicationContext {
                 if (!active && !existingSession && !attemptedSession) {
                     attemptedSession = true;
                     try {
-                        Apply();
+                        int w, h;
+                        if (TargetFor(games, out w, out h)) Apply(w, h);
+                        else Store.Log(games[0] + " fica na resolução normal, como configurado para esse jogo.", LogKind.Game);
                         lastError = "";
                     } catch (Exception e) {
                         Store.Log(e.Message, LogKind.Error);
@@ -526,6 +528,49 @@ public class AppContext : ApplicationContext {
         } catch (Exception e) { Store.Log("Erro ao ler a janela do jogo: " + e.Message, LogKind.Error); }
     }
 
+    // The resolution a game gets: its own choice if the person made one, otherwise the general one. False means this game
+    // stays at the normal resolution.
+    bool TargetFor(List<string> games, out int w, out int h) {
+        w = config.Width;
+        h = config.Height;
+        var rule = config.Games.FirstOrDefault(g => games.Contains(g.Name));
+        var mode = rule == null ? null : GamePreferences.ModeOf(config, GamePreferences.Key(rule));
+        if (mode == null) return true;
+        if (mode.Width == 0) return false;
+        w = mode.Width;
+        h = mode.Height;
+        return true;
+    }
+
+    // width -1 = back to the general resolution, 0 = leave this game at the normal resolution, otherwise that resolution.
+    public void SetGameMode(string key, int width, int height) {
+        if (active || Running().Count > 0) throw new Exception("Feche o jogo antes de mudar isso.");
+        GamePreferences.SetMode(config, key, width, height);
+        SaveConfiguration();
+        Store.Log("Resolução do jogo mudou: " + (width < 0 ? "padrão" : width == 0 ? "normal" : width + " × " + height) + ".", LogKind.Library);
+    }
+
+    public string GameModeText(string key) {
+        var mode = GamePreferences.ModeOf(config, key);
+        if (mode == null) return config.Width > 0 ? "Padrão (" + config.Width + " × " + config.Height + ")" : "Padrão";
+        return mode.Width == 0 ? "Normal (não trocar)" : mode.Width + " × " + mode.Height;
+    }
+
+    // Applies a resolution for a few seconds with no game running, so the person can see whether the monitor takes it.
+    // The usual "no game running" logic then puts the desktop back on its own.
+    public void TestResolution(int w, int h) {
+        if (active || Running().Count > 0) throw new Exception("Feche o jogo antes de testar.");
+        Apply(w, h);
+        emptySince = DateTime.Now.AddSeconds(3); // ~6 s in total instead of the usual 3
+        Store.Log("Teste de resolução: " + w + " × " + h + ". Volta sozinha em instantes.", LogKind.Game);
+    }
+
+    public void SetSortMode(string mode) {
+        config.SortMode = mode;
+        SaveConfiguration(); // bumps the library version, so the window reorders itself
+    }
+
+    int gameW, gameH;
     DateTime revertedSince = DateTime.MinValue, modeWindow = DateTime.MinValue;
     int modeRestores;
     bool modeGaveUp;
@@ -533,7 +578,7 @@ public class AppContext : ApplicationContext {
     void KeepGameMode() {
         try {
             var now = Native.Current(Device());
-            if (now.width != config.DesktopWidth || now.height != config.DesktopHeight || (now.width == config.Width && now.height == config.Height)) { revertedSince = DateTime.MinValue; return; }
+            if (now.width != config.DesktopWidth || now.height != config.DesktopHeight || (now.width == gameW && now.height == gameH)) { revertedSince = DateTime.MinValue; return; }
             // Only when the person is back in the game. Changing the mode while the game is in the background makes it
             // hand the desktop back again right away (Red Dead did it every few seconds), so it waits for the game's window.
             if (!DesktopLayout.GamePids(config.Games).Contains(Native.ForegroundPid())) { revertedSince = DateTime.MinValue; return; }
@@ -547,7 +592,7 @@ public class AppContext : ApplicationContext {
             modeRestores++;
             revertedSince = DateTime.MinValue;
             string device = Device();
-            var target = Native.Find(device, config.Width, config.Height, now.hz);
+            var target = Native.Find(device, gameW, gameH, now.hz);
             if (Native.Set(device, target, true) != 0 || Native.Set(device, target, false) != 0) { Store.Log("Não deu para ligar a resolução de jogo de novo.", LogKind.Error); return; }
             // The mode change moves windows on the other monitor again; put them back where they were before the game.
             var saved = File.Exists(Store.State) ? Store.Read<Recovery>(Store.State).Windows : null;
@@ -580,17 +625,19 @@ public class AppContext : ApplicationContext {
         SaveConfiguration();
     }
 
-    void Apply() {
-        if (config.Width == 0) throw new Exception("Nenhuma resolução maior que a do desktop está disponível. " + Native.EnableHint);
+    void Apply(int w, int h) {
+        gameW = w;
+        gameH = h;
+        if (w == 0) throw new Exception("Nenhuma resolução maior que a do desktop está disponível. " + Native.EnableHint);
         string device = Device();
         var current = Native.Current(device);
-        var target = Native.Find(device, config.Width, config.Height, current.hz);
+        var target = Native.Find(device, w, h, current.hz);
         int test = Native.Set(device, target, true);
-        if (test != 0) throw new Exception("O driver recusou " + config.Width + " × " + config.Height + ". Nada foi alterado.");
+        if (test != 0) throw new Exception("O driver recusou " + w + " × " + h + ". Nada foi alterado.");
 
         // Return to the desktop mode in use now; if it is already the game mode, fall back to the last known desktop mode.
         int deskW = current.width, deskH = current.height;
-        if (deskW == config.Width && deskH == config.Height) {
+        if (deskW == w && deskH == h) {
             deskW = config.DesktopWidth;
             deskH = config.DesktopHeight;
         } else if (deskW != config.DesktopWidth || deskH != config.DesktopHeight) {
@@ -610,13 +657,13 @@ public class AppContext : ApplicationContext {
         DesktopLayout.Track(windows, ownerPid);
         int rc = Native.Set(device, target, false);
         var after = Native.Current(device);
-        if (rc != 0 || after.width != config.Width || after.height != config.Height) {
+        if (rc != 0 || after.width != w || after.height != h) {
             Store.Restore();
             active = File.Exists(Store.State);
-            throw new Exception("O monitor não aceitou " + config.Width + " × " + config.Height + ".");
+            throw new Exception("O monitor não aceitou " + w + " × " + h + ".");
         }
         if (config.CenterSecondMonitor && before != null) CenterNeighbours(device, before, others);
-        DesktopLayout.Settle(windows.Where(w => !String.Equals(w.Device, device, StringComparison.OrdinalIgnoreCase)).ToList());
+        DesktopLayout.Settle(windows.Where(x => !String.Equals(x.Device, device, StringComparison.OrdinalIgnoreCase)).ToList());
         Store.Log("Resolução de jogo ligada: " + after.width + " × " + after.height + " a " + after.hz + " Hz.", LogKind.Game);
         diagnoseAt = DateTime.Now.AddSeconds(15);
         // No icon: Windows then shows only the app's own icon in the header, instead of a generic blue "i".
@@ -643,7 +690,7 @@ public class AppContext : ApplicationContext {
 
     void UpdateStatus() {
         string text = paused ? "Pausado"
-            : active ? "Em jogo em " + config.Width + " × " + config.Height
+            : active ? "Em jogo em " + gameW + " × " + gameH
             : lastError != "" ? "Resolução indisponível"
             : "Esperando um jogo";
         status.Text = text;

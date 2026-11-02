@@ -14,7 +14,7 @@ public class SettingsOverlay : Modal {
     readonly SelectBox monitors, resolutions, logLevel;
     readonly ToggleSwitch switching, competitive, startup, taskbar, autoUpdate, centerSecond;
     readonly Label resolutionHelp, updateInfo;
-    readonly FlatButton updateButton;
+    readonly FlatButton updateButton, testButton;
     readonly System.Windows.Forms.Timer refresh;
     bool syncing;
 
@@ -43,6 +43,12 @@ public class SettingsOverlay : Modal {
         var reload = new FlatButton { Glyph = Theme.IconRefresh, Kind = ButtonKind.Quiet, Width = Theme.S(36) };
         reload.Click += delegate { ReloadResolutions(); };
         new ToolTip().SetToolTip(reload, "Atualizar a lista");
+        testButton = new FlatButton { Text = "Testar", Width = Theme.S(72) };
+        new ToolTip().SetToolTip(testButton, "Liga a resolução escolhida por uns segundos e volta sozinha, para ver se o monitor aceita.");
+        testButton.Click += delegate {
+            var r = resolutions.SelectedItem as ResolutionChoice;
+            if (r != null) Act(() => owner.TestResolution(r.Width, r.Height));
+        };
         resolutionHelp = new Label { Cursor = Cursors.Hand };
         resolutionHelp.Click += delegate { ShowResolutionHelp(); };
         centerSecond = new ToggleSwitch();
@@ -78,7 +84,7 @@ public class SettingsOverlay : Modal {
             Row("Trocar resolução nos jogos", null, null, switching, true),
             Group("Tela",
                 Row("Monitor", null, null, monitors),
-                Row("Resolução nos jogos", null, resolutionHelp, Pair(reload, resolutions)),
+                Row("Resolução nos jogos", null, resolutionHelp, Pair(Pair(testButton, reload), resolutions)),
                 Row("Centralizar o 2º monitor", "Durante o jogo, alinha o segundo monitor ao meio do principal.", null, centerSecond)),
             Group("Jogos",
                 Row("Ignorar competitivos", "Ficam na resolução nativa, onde FPS e latência pesam mais que nitidez.", null, competitive)),
@@ -264,6 +270,7 @@ public class SettingsOverlay : Modal {
             monitors.SelectedItem = screens.FirstOrDefault(s => s.Device == owner.DisplayDevice);
             monitors.Enabled = free;
             resolutions.Enabled = free && resolutions.Items.Count > 0;
+            testButton.Enabled = free && resolutions.Items.Count > 0;
             resolutionHelp.Text = resolutions.Items.Count == 0 ? "Nenhuma maior que a tela. Como ativar" : "Como funciona na NVIDIA e na AMD";
             resolutionHelp.ForeColor = Theme.Text;
             if (!resolutionHelp.Font.Underline) resolutionHelp.Font = new Font(resolutionHelp.Font, FontStyle.Underline);
