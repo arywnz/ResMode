@@ -30,6 +30,12 @@ Infelizmente, o Windows achou que seria engraçado complicar as coisas, então a
 - **Usuários de VSR da AMD:** porque a NVIDIA não é dona da brincadeira.
 - **Quem usa dois ou mais monitores:** e já viu o Windows reorganizar tudo como se tivesse jogado os monitores dentro de um liquidificador.
 - **Quem tem preguiça de configurar tudo manualmente:** provavelmente o público-alvo mais importante.
+  
+- **E a Intel Arc?**
+
+Não tem suporte oficial, meu consagrado, quem é que compra essa porraKKKKKKKKKKKKKKKK
+
+Piadocas a parte, não foi testado em placas Intel Arc(pasmem, nao tenho acesso a uma) Se você é um dos 7 proprietários de uma dessas, pode até funcionar, mas não prometo absolutamente nada. Se testar, abre uma issue contando o resultado, a ciência e o pcsismo agradece.
 
 Se você joga sempre na resolução nativa e está feliz assim, talvez não precise disso. Aproveite sua paz.
 
