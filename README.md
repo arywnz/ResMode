@@ -1,6 +1,6 @@
 # ResMode
 
-> **Aviso antes de tudo:** o ResMode foi feito para ser usado com upscaling **FSR 4 ou DLSS**. Resolução maior + upscaler decente é a receita. Se o jogo tem FSR 3, o driver da AMD consegue trocar por FSR 4 na hora, então está tudo bem. Agora, de FSR 2 para baixo a imagem fica uma merda, toda farinhenta, e nem o ResMode te salva disso. Aceite o destino ou troque de jogo e LEVE em consideração que resoluções mais altas o uso de VRAM é maior.
+> **Aviso antes de tudo:** o ResMode foi feito para ser usado com upscaling **FSR 4 ou DLSS**. Resolução maior + upscaler decente é o dream dos videojogos e games. Se o jogo tem FSR 3, o driver da AMD consegue trocar por FSR 4 na hora, então está tudo bem. Agora, de FSR 2 para baixo a imagem fica uma merda, toda farinhenta, e nem o ResMode te salva disso. Aceite o destino ou troque de jogo e LEVE em consideração que resoluções mais altas o uso de VRAM é maior.
 
 **Você gastou uma fortuna na placa de vídeo pra ficar refém de um monitor 1080p de betinha.**
 
