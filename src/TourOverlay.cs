@@ -28,7 +28,7 @@ public class TourOverlay : Modal {
 
     readonly AppContext owner;
     readonly Label title, body, counter;
-    readonly FlatButton next, back, skip;
+    readonly FlatButton next, back, skip, guide;
     readonly StepDots dots;
     readonly Step[] steps;
     int step;
@@ -43,7 +43,7 @@ public class TourOverlay : Modal {
                 var cfg = owner.Configuration;
                 return cfg.Width > 0
                     ? "Seu monitor já oferece resoluções maiores que a dele, e o ResMode escolheu " + cfg.Width + " × " + cfg.Height + ". Dá para trocar nas Configurações, e o botão Testar mostra por alguns segundos como fica."
-                    : "Seu monitor ainda não oferece uma resolução maior. Ative o DSR (NVIDIA) ou o VSR (AMD) no painel da placa de vídeo, volte aqui e use o botão de atualizar a lista, nas Configurações.";
+                    : "Seu monitor ainda não oferece uma resolução maior. Ative o DSR (NVIDIA) ou o VSR (AMD) no painel da placa de vídeo. O passo a passo abaixo abre o painel certo para a sua placa e confere quando você terminar.";
             } },
             new Step { Title = "Sua biblioteca", Body = () =>
                 "Os jogos da Steam, Epic, GOG e outros aparecem sozinhos. Clique em um jogo para jogar, ignorá-lo ou escolher uma resolução só para ele. Jogos que ficam fora de launchers são procurados no PC e dá para adicionar à mão." },
@@ -63,7 +63,10 @@ public class TourOverlay : Modal {
         next.Click += delegate { if (step >= steps.Length - 1) Close(); else ShowStep(step + 1); };
         back.Click += delegate { if (step > 0) ShowStep(step - 1); };
         skip.Click += delegate { Close(); };
-        Controls.AddRange(new Control[] { counter, title, body, dots, skip, back, next });
+        // Only on the resolution step, and only when the driver offers nothing larger yet.
+        guide = new FlatButton { Text = "Ativar passo a passo", Kind = ButtonKind.Secondary };
+        guide.Click += delegate { owner.RequestGuide(); Close(); };
+        Controls.AddRange(new Control[] { counter, title, body, dots, skip, back, next, guide });
         ShowStep(0);
     }
 
@@ -76,8 +79,10 @@ public class TourOverlay : Modal {
         dots.Invalidate();
         next.Text = index == steps.Length - 1 ? "Começar" : "Próximo";
         next.Width = Math.Max(next.PreferredWidth(), Theme.S(110));
-        back.Visible = index > 0;
-        skip.Visible = index < steps.Length - 1;
+        // Zero width rather than Visible: the modal turns every child visible again when it opens.
+        back.Width = index > 0 ? back.PreferredWidth() : 0;
+        skip.Width = index < steps.Length - 1 ? skip.PreferredWidth() : 0;
+        guide.Width = index == 1 && owner.Configuration.Width == 0 ? Math.Max(guide.PreferredWidth(), Theme.S(180)) : 0;
         PerformLayout();
         Invalidate(true);
     }
@@ -90,6 +95,7 @@ public class TourOverlay : Modal {
         title.SetBounds(x, card.Y + Theme.S(58), w, Theme.S(40));
         body.SetBounds(x, card.Y + Theme.S(116), w, Theme.S(130));
         dots.SetBounds(x, card.Y + Theme.S(240), Theme.S(120), Theme.S(20));
+        guide.Location = new Point(x, card.Y + Theme.S(186));
         int by = card.Bottom - Theme.S(28) - next.Height;
         next.Location = new Point(card.Right - pad - next.Width, by);
         back.Location = new Point(next.Left - Theme.S(8) - back.Width, by);

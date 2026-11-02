@@ -36,7 +36,7 @@ public class AppContext : ApplicationContext {
     Task<List<GameRule>> catalogTask;
     Task<List<GameCandidate>> searchTask;
     bool catalogRan;
-    DateTime nextCatalog = DateTime.Now.AddSeconds(10);
+    DateTime nextCatalog = DateTime.Now.AddSeconds(3);
     bool forceCatalog = true; // one quick scan after startup picks up anything installed while the app was closed
     DateTime nextShellCheck = DateTime.MinValue;
     readonly List<FileSystemWatcher> watchers = new List<FileSystemWatcher>();
@@ -509,6 +509,20 @@ public class AppContext : ApplicationContext {
         } catch (Exception e) { Store.Log("Erro ao ler o monitor: " + e.Message, LogKind.Error); }
     }
 
+    // After the person turns DSR/VSR on in the driver: read the monitor's modes again and, if there is a larger one now,
+    // pick the largest. Returns the message to show.
+    public string RecheckModes() {
+        if (active || Running().Count > 0) throw new Exception("Feche o jogo antes de verificar.");
+        int before = config.Width;
+        FillDisplayDefaults(false);
+        if (config.Width > 0 && before == 0) {
+            SaveConfiguration();
+            Notify("Resolução encontrada", config.Width + " × " + config.Height + " vai ser usada nos jogos. Dá para trocar nas Configurações.", LogKind.Library);
+            return config.Width + " × " + config.Height + " encontrada.";
+        }
+        return config.Width > 0 ? "Já está tudo certo: " + config.Width + " × " + config.Height + "." : "Ainda não aparece nenhuma resolução maior. Confira se aplicou a mudança no painel.";
+    }
+
     // The game mode is temporary, so some games hand the desktop back when they lose focus (alt-tab, a click on the
     // other monitor). While the game is still open and the screen has gone back to the desktop mode, put the game mode
     // back. It waits a couple of seconds so it never fights the game's own mode change, and gives up after a few
@@ -568,7 +582,9 @@ public class AppContext : ApplicationContext {
     }
 
     // Walkthrough: shown once to a new install, and again on request ("Rever guia" in Settings).
-    bool tourRequested;
+    bool tourRequested, guideRequested;
+    public void RequestGuide() { guideRequested = true; }
+    public bool TakeGuideRequest() { bool asked = guideRequested; guideRequested = false; return asked; }
     public void RequestTour() { tourRequested = true; }
     public bool TakeTourRequest() { bool asked = tourRequested; tourRequested = false; return asked; }
     public void MarkTourDone() {
@@ -680,8 +696,16 @@ public class AppContext : ApplicationContext {
         diagnoseAt = DateTime.Now.AddSeconds(15);
         // No icon: Windows then shows only the app's own icon in the header, instead of a generic blue "i".
         string game = RunningNames.FirstOrDefault();
-        tray.ShowBalloonTip(2500, (game ?? "Jogo") + " em " + after.width + " × " + after.height,
-            "No jogo, use " + after.width + " × " + after.height + " (em janela sem borda ocupa a tela toda). Volta para " + deskW + " × " + deskH + " ao fechar.", ToolTipIcon.None);
+        Announce((game ?? "Jogo") + " em " + after.width + " × " + after.height,
+            "No jogo, use " + after.width + " × " + after.height + " (em janela sem borda ocupa a tela toda). Volta para " + deskW + " × " + deskH + " ao fechar.", 2500);
+    }
+
+    public bool WindowVisible { get { return dashboard != null && !dashboard.IsDisposed && dashboard.Visible && dashboard.WindowState != FormWindowState.Minimized; } }
+
+    // With the window open the message shows inside it (and in the bell); otherwise it is a tray balloon.
+    void Announce(string title, string text, int milliseconds) {
+        if (WindowVisible) Notify(title, text, LogKind.Game);
+        else tray.ShowBalloonTip(milliseconds, title, text, ToolTipIcon.None);
     }
 
     bool Restore() {

@@ -74,6 +74,9 @@ public class FlatButton : Painted {
     protected override void OnPaint(PaintEventArgs e) {
         var g = e.Graphics;
         g.Clear(ParentColor);
+        // A button folded away by making it zero-wide (a walkthrough hides Voltar/Pular this way) has nothing to draw,
+        // and a zero-size gradient rectangle throws.
+        if (Width < 4 || Height < 4) return;
         Theme.Smooth(g);
         var r = new RectangleF(0.5f, 0.5f, Width - 1, Height - 1);
         float radius = Theme.S(9);
@@ -544,6 +547,29 @@ public class GameGrid : ScrollSurface {
     int Edge { get { return Theme.S(12); } }
     int Columns { get { return Math.Max(1, (Width - Theme.S(10) - Edge + Gap) / (Cover.Width + Gap)); } }
 
+    // Games that just joined the library wear a "Novo" badge for a few seconds.
+    readonly Dictionary<string, DateTime> fresh = new Dictionary<string, DateTime>();
+    System.Windows.Forms.Timer freshTimer;
+    const int FreshSeconds = 14;
+
+    bool IsFresh(string key) {
+        DateTime at;
+        return fresh.TryGetValue(key, out at) && (DateTime.UtcNow - at).TotalSeconds < FreshSeconds;
+    }
+
+    public void MarkNew(IEnumerable<string> keys) {
+        foreach (string key in keys) fresh[key] = DateTime.UtcNow;
+        Invalidate();
+        if (freshTimer != null) return;
+        // One repaint a second until the badges have run out, so they disappear without a click.
+        freshTimer = new System.Windows.Forms.Timer { Interval = 1000 };
+        freshTimer.Tick += delegate {
+            Invalidate();
+            if (!fresh.Keys.Any(IsFresh)) { freshTimer.Stop(); freshTimer.Dispose(); freshTimer = null; fresh.Clear(); }
+        };
+        freshTimer.Start();
+    }
+
     // One shared ticker; cards enter in reading order without delaying artwork loading.
     public void SetGames(List<LibraryGame> list, bool animate) {
         ResetHover();
@@ -868,7 +894,7 @@ public class GameGrid : ScrollSurface {
                 bool pressed = pressKey == game.Key;
                 // Reuse the static part of the hover; only pointer-following light is drawn live.
                 if (!pressed && appearance >= 1 && art != null && art.Cover != null &&
-                    DateTime.UtcNow.Ticks - art.LoadedTicks >= TimeSpan.TicksPerMillisecond * 320 && game.Installed && !IsRunning(game)) {
+                    DateTime.UtcNow.Ticks - art.LoadedTicks >= TimeSpan.TicksPerMillisecond * 320 && game.Installed && !IsRunning(game) && !IsFresh(game.Key)) {
                     var tile = HoverTile(game, art, hov, playHot && game.Key == hotKey);
                     int margin = Artwork.CardMargin;
                     var mode = g.InterpolationMode;var pixelMode = g.PixelOffsetMode;
@@ -941,6 +967,7 @@ public class GameGrid : ScrollSurface {
                 }
                 if (IsRunning(game)) Pill(g, "Em jogo", small, Theme.Live, coverRect.X + Theme.S(8), coverRect.Y + Theme.S(8));
                 else if (!game.Installed) Pill(g, "Não encontrado", small, Theme.Warn, coverRect.X + Theme.S(8), coverRect.Y + Theme.S(8));
+                else if (IsFresh(game.Key)) Pill(g, "Novo", small, Theme.Accent, coverRect.X + Theme.S(8), coverRect.Y + Theme.S(8));
 
                 // Name and launcher come from a cached transparent bitmap: drawing text costs ~0.6 ms a line,
                 // which over every card was most of the frame time while hovering.
@@ -957,6 +984,7 @@ public class GameGrid : ScrollSurface {
 
     protected override void Dispose(bool disposing) {
         if (disposing) {
+            if (freshTimer != null) { freshTimer.Dispose(); freshTimer = null; }
             if (edgeLightImage != null) edgeLightImage.Dispose();
             if (glossLightImage != null) glossLightImage.Dispose();
             if (playImage != null) playImage.Dispose();

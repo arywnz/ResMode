@@ -118,6 +118,7 @@ public static class Catalog {
     static readonly Regex SteamTool = new Regex(@"(?i)redistributable|steamworks|linux runtime|^proton\b|steamvr|\bsdk\b|dedicated server|soundtrack|\bost\b|artbook|wallpaper engine|authoring tools|\bmod tools\b|^source filmmaker|spacewar");
     public static bool LooksLikeSteamTool(string name) { return SteamTool.IsMatch(name ?? ""); }
 
+    static bool burst; // a forced scan (first run, refresh button) does not pace itself
     static List<GameRule> FindExes(string root, string name, string source, Func<bool> stop) {
         var games = new List<GameRule>();
         var queue = new Queue<Tuple<string, int>>();
@@ -133,7 +134,7 @@ public static class Catalog {
                     foreach (string sub in Directory.EnumerateDirectories(d.Item1))
                         if (!IsHelperFolder(Path.GetFileName(sub))) queue.Enqueue(Tuple.Create(sub, d.Item2 + 1));
             } catch (UnauthorizedAccessException) { } catch (IOException) { }
-            Thread.Sleep(2);
+            if (!burst) Thread.Sleep(2);
         }
         return games;
     }
@@ -147,6 +148,22 @@ public static class Catalog {
         var result = new List<GameRule>();
         Func<bool> stop = delegate { return !force && Native.IdleMs() < 30000; };
 
+        burst = force;
+        // New games: ask the store about all of them at once instead of one after another (about 3 s each), which is
+        // what kept a first install's library empty for a minute or two.
+        var types = new System.Collections.Concurrent.ConcurrentDictionary<string, string>();
+        try {
+            var pending = new List<string>();
+            foreach (string library in SteamLibraries())
+                foreach (string manifest in Directory.EnumerateFiles(library, "appmanifest_*.acf")) {
+                    string appId = Value(File.ReadAllText(manifest), "appid");
+                    if (!Regex.IsMatch(appId, @"^\d+$") || pending.Contains(appId)) continue;
+                    var known = cache.Entries.FirstOrDefault(e => e.Id == appId);
+                    if (known == null || known.Type == "unknown") pending.Add(appId);
+                }
+            if (pending.Count > 1)
+                System.Threading.Tasks.Parallel.ForEach(pending, new System.Threading.Tasks.ParallelOptions { MaxDegreeOfParallelism = 8 }, appId => { try { types[appId] = Type(appId); } catch { } });
+        } catch { }
         bool storeDown = false; // after one failed store lookup the rest of this scan skips the store
         foreach (string library in SteamLibraries())
             foreach (string manifest in Directory.EnumerateFiles(library, "appmanifest_*.acf")) {
@@ -168,6 +185,8 @@ public static class Catalog {
                         continue;
                     }
                     string type = previous != null && previous.Type != "unknown" ? previous.Type : "unknown";
+                    string prefetched;
+                    if (type == "unknown" && types.TryGetValue(id, out prefetched)) type = prefetched;
                     if (type == "unknown" && !storeDown) {
                         // The store can be unreachable, rate-limited, or not know the app (delisted games); that must not hide the library.
                         try { type = Type(id); } catch (Exception e) { storeDown = true; Store.Log("Steam Store sem resposta (" + e.Message + "). O resto da biblioteca é identificado pelo nome.", LogKind.Library); }

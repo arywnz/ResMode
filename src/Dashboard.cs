@@ -85,6 +85,20 @@ public class Dashboard : Form {
     readonly System.Windows.Forms.Timer refresh;
     Modal modal;
     int version = -1;
+    HashSet<string> knownKeys;
+    readonly ToastCard toast = new ToastCard();
+    DateTime toastedAt = DateTime.Now;
+
+    // Notices created while the window is open also show as a toast, at the bottom right.
+    void ShowToastForNewNotice() {
+        var latest = owner.Notices.FirstOrDefault();
+        if (latest == null || latest.Time <= toastedAt) return;
+        toastedAt = latest.Time;
+        toast.Display(latest.Title, latest.Text, latest.Kind == LogKind.Error ? Theme.Danger : latest.Kind == LogKind.Game ? Theme.Live : latest.Kind == LogKind.Library ? Theme.Accent : Theme.Muted);
+        PlaceToast();
+    }
+
+    void PlaceToast() { toast.Location = new Point(ClientSize.Width - toast.Width - Theme.S(24), ClientSize.Height - toast.Height - Theme.S(24)); }
     string runningKey = "";
     bool closing;
 
@@ -145,9 +159,9 @@ public class Dashboard : Form {
         // Shown while the driver offers no resolution above the desktop's, which is the usual first-run stumble.
         hintBar = new Panel { Dock = DockStyle.Top, Height = Theme.S(52), BackColor = Theme.Mix(Theme.Surface, Theme.Warn, 0.10f), Visible = false };
         var hintText = new Label { AutoSize = false, Text = "Seu monitor ainda não oferece uma resolução maior. Ative o DSR (NVIDIA) ou o VSR (AMD) no painel da placa de vídeo para o ResMode ter o que ligar nos jogos.", Font = Theme.Body(10), ForeColor = Theme.Text, BackColor = hintBar.BackColor, TextAlign = ContentAlignment.MiddleLeft };
-        var hintButton = new FlatButton { Text = "Como ativar", Kind = ButtonKind.Secondary };
+        var hintButton = new FlatButton { Text = "Ativar agora", Kind = ButtonKind.Secondary };
         hintButton.Width = hintButton.PreferredWidth();
-        hintButton.Click += delegate { ShowModal(new SettingsOverlay(owner, WindowSnapshot)); };
+        hintButton.Click += delegate { ShowModal(new DriverGuide(owner, WindowSnapshot)); };
         hintBar.Controls.AddRange(new Control[] { hintText, hintButton });
         hintBar.Layout += delegate {
             hintButton.Location = new Point(hintBar.Width - Theme.S(28) - hintButton.Width, (hintBar.Height - hintButton.Height) / 2);
@@ -158,6 +172,8 @@ public class Dashboard : Form {
         Controls.Add(tabsRow);
         Controls.Add(hintBar);
         Controls.Add(topBar);
+        Controls.Add(toast);
+        toast.BringToFront();
 
         refresh = new System.Windows.Forms.Timer { Interval = 1000 };
         refresh.Tick += delegate { UpdateView(); };
@@ -206,6 +222,7 @@ public class Dashboard : Form {
     protected override void OnResize(EventArgs e) {
         base.OnResize(e);
         if (WindowState == FormWindowState.Minimized) Native.TrimMemory();
+        else if (toast.Visible) PlaceToast();
     }
 
     // Closing fades the window out first.
@@ -302,6 +319,12 @@ public class Dashboard : Form {
     void ReloadGames(bool animate) {
         var all = GamePreferences.Groups(owner.Configuration);
         var active = all.Where(g => !g.Excluded).ToList();
+        // A game that joins the library while the window is open gets a "Novo" badge (not the first load, not a bulk scan).
+        if (knownKeys != null) {
+            var added = active.Where(g => !knownKeys.Contains(g.Key)).Select(g => g.Key).ToList();
+            if (added.Count > 0 && added.Count <= 4) grid.MarkNew(added);
+        }
+        knownKeys = new HashSet<string>(active.Select(g => g.Key));
         object selectedTag = filter.Tabs.Count > filter.Index ? filter.Tabs[filter.Index].Tag : "all";
         var tabs = new List<Segments.Tab> { new Segments.Tab { Label = "Todos", Count = active.Count, Tag = "all" } };
         foreach (var l in Launchers.All) {
@@ -452,8 +475,10 @@ public class Dashboard : Form {
         if (owner.CatalogBusy && !refreshButton.Spinning) refreshButton.Start(() => owner.CatalogPending);
         if (bell.Unread != owner.Unread) { bell.Unread = owner.Unread; bell.Invalidate(); }
         modePill.SetState(owner.DisplayActive, owner.DisplayActive ? owner.CurrentMode : "");
+        if (WindowState != FormWindowState.Minimized) ShowToastForNewNotice();
         if (modal == null && owner.TakeTourRequest()) ShowModal(new TourOverlay(owner, WindowSnapshot));
-        hintBar.Visible = owner.Configuration.Width == 0 && owner.Configuration.Games.Count > 0;
+        else if (modal == null && owner.TakeGuideRequest()) ShowModal(new DriverGuide(owner, WindowSnapshot));
+        hintBar.Visible = owner.Configuration.Width == 0;
     }
 
     void Act(Action action) {

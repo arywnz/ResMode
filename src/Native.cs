@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.18";
+    public const string Release = "0.2.2-alpha.19";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -168,13 +168,13 @@ public static class Native {
             .OrderBy(m => m.width * (double)m.height).ToList();
     }
 
-    // First-run pick: the mode closest to 2.25× the desktop's pixels (DLDSR's sharpest factor), if the driver offers any.
+    // First-run pick: the largest mode the driver offers above the desktop's. The person can lower it in Settings
+    // or per game; the default is the most the screen can be made to render.
     public static bool PickGameMode(string device, int desktopW, int desktopH, out int w, out int h) {
         var modes = LargerModes(device, desktopW, desktopH);
         w = h = 0;
         if (modes.Count == 0) return false;
-        double desktop = desktopW * (double)desktopH;
-        var best = modes.OrderBy(m => Math.Abs(m.width * (double)m.height / desktop - 2.25)).First();
+        var best = modes.OrderByDescending(m => m.width * (double)m.height).First();
         w = best.width;
         h = best.height;
         return true;

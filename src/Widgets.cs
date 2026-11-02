@@ -571,3 +571,70 @@ public class ResolutionPanel : Painted {
             }
     }
 }
+
+// A short message that slides in at the bottom right of the window for a few seconds (instead of a tray balloon,
+// which sits outside the app). Click to dismiss.
+public class ToastCard : Painted {
+    string title = "", text = "";
+    Color accent = Theme.Muted;
+    readonly System.Windows.Forms.Timer hide = new System.Windows.Forms.Timer { Interval = 6500 };
+    float t;
+    const TextFormatFlags Wrap = TextFormatFlags.WordBreak | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding | TextFormatFlags.EndEllipsis;
+
+    public ToastCard() {
+        BackColor = Theme.Raised;
+        Visible = false;
+        Cursor = Cursors.Hand;
+        hide.Tick += delegate { hide.Stop(); Dismiss(); };
+    }
+
+    public void Display(string title, string text, Color accent) {
+        this.title = title ?? "";
+        this.text = text ?? "";
+        this.accent = accent;
+        int w = Theme.S(380), inner = w - Theme.S(52);
+        using (var bold = Theme.Body(11, true)) using (var body = Theme.Body(10)) {
+            int th = TextRenderer.MeasureText(this.title, bold, new Size(inner, 0), Wrap).Height;
+            int bh = this.text == "" ? 0 : Math.Min(TextRenderer.MeasureText(this.text, body, new Size(inner, 0), Wrap).Height, body.Height * 3 + Theme.S(4));
+            Size = new Size(w, Theme.S(32) + th + (bh > 0 ? Theme.S(6) + bh : 0));
+        }
+        var shape = Theme.Round(new RectangleF(0, 0, Width, Height), Theme.S(14));
+        Region = new Region(shape);
+        shape.Dispose();
+        Visible = true;
+        BringToFront();
+        t = 0;
+        Motion.Run(Tuple.Create(this, "toast"), Motion.Normal, v => { t = v; Invalidate(); });
+        hide.Stop();
+        hide.Start();
+    }
+
+    void Dismiss() {
+        Motion.Run(Tuple.Create(this, "toast"), Motion.Fast, v => { t = 1 - v; Invalidate(); }, delegate { Visible = false; });
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e) { hide.Stop(); Dismiss(); base.OnMouseClick(e); }
+
+    protected override void Dispose(bool disposing) {
+        if (disposing) hide.Dispose();
+        base.Dispose(disposing);
+    }
+
+    protected override void OnPaint(PaintEventArgs e) {
+        var g = e.Graphics;
+        g.Clear(BackColor);
+        Theme.Smooth(g);
+        var r = new Rectangle(0, 0, Width - 1, Height - 1);
+        Theme.Stroke(g, r, Theme.S(14), Theme.Border);
+        int d = Theme.S(8), x = Theme.S(18);
+        using (var b = new SolidBrush(accent)) g.FillEllipse(b, x, Theme.S(18), d, d);
+        int tx = x + d + Theme.S(12), tw = Width - tx - Theme.S(16);
+        using (var bold = Theme.Body(11, true)) using (var body = Theme.Body(10)) {
+            int th = TextRenderer.MeasureText(title, bold, new Size(tw, 0), Wrap).Height;
+            TextRenderer.DrawText(g, title, bold, new Rectangle(tx, Theme.S(14), tw, th), Theme.Text, Wrap);
+            if (text != "") TextRenderer.DrawText(g, text, body, new Rectangle(tx, Theme.S(14) + th + Theme.S(6), tw, body.Height * 3 + Theme.S(4)), Theme.Muted, Wrap);
+        }
+        // Fade by veiling toward the window colour (the card is a child control, not a layered window).
+        if (t < 1) using (var veil = new SolidBrush(Color.FromArgb((int)((1 - t) * 255), Theme.Base))) g.FillRectangle(veil, ClientRectangle);
+    }
+}
