@@ -105,4 +105,3 @@ Licença [MIT](LICENSE). As fontes Geist possuem licença própria, descrita em 
 
 ---
 
-**ResMode — porque trocar a resolução manualmente toda vez que abre um jogo já estava virando profissão.**
