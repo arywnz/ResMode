@@ -24,6 +24,8 @@ Pois é,Eu também achei uma porra fazer isso toda hora.
 
 Infelizmente, o Windows achou que seria engraçado complicar as coisas, então agora o programa também precisa cuidar das janelas, dos outros monitores e de umas situações que eu preferia nunca ter descoberto.
 
+**Não testei com mais de dois monitores.** Então, já sabe, né, paezão? Se você tem três ou mais, faz o L (de **levar o feedback lá nas issues**, obviamente) e conta se essa budega funcionou ou se o Windows resolveu cometer um crime.
+
 ## Pra quem é essa geringonça?
 
 - **Usuários de DLDSR/DSR da NVIDIA:** para quem tem um monitor humilde, mas quer renderizar jogos em resoluções maiores.
