@@ -63,7 +63,7 @@ O instalador ainda não possui assinatura digital. Portanto, o Windows pode recl
 
 **Isso aumenta FPS?**
 
-Não, meu consagrado. Renderizar mais pixels normalmente exige *mais* da placa de vídeo. O objetivo aqui é facilitar o uso de resoluções maiores, não fazer uma GTX 750 Ti virar uma RTX 5090.
+Não, meu consagrado. Renderizar mais pixels normalmente exige *mais* da placa de vídeo. O objetivo aqui é facilitar o uso de resoluções maiores, não fazer sua RX 580 xing xong surrada do aliexpress virar uma RTX 5090.
 
 **Funciona com qualquer jogo?**
 
