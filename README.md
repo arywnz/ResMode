@@ -1,6 +1,6 @@
 # ResMode
 
-**Seu monitor é 1080p, sua placa de vídeo aguenta mais e o Windows não colabora.**
+**There was an error committing your changes: arywnz has committed since you started editing. See what changed**
 
 O ResMode nasceu de um problema extremamente específico: querer jogar em uma resolução maior sem precisar transformar o desktop inteiro num experimento científico toda vez que abre um jogo.
 
