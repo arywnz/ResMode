@@ -71,6 +71,14 @@ public static class FeatureChecks {
             Check(GamePreferences.ModeOf(cfg,"steam:1")==null&&cfg.GameModes.Count==1,"Voltar ao padrão não removeu a escolha do jogo.");
             results.Add("PASS: resolução por jogo (guardar, trocar, normal e voltar ao padrão).");
         }
+        {
+            string user=Environment.UserName,profile=Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            string scrubbed=LogExport.Scrub("Erro em "+profile+@"\AppData\x e D:\Users\Maria Souza\Documents\y e C:\Users\outra\z de "+user+" com ana.silva@example.com id S-1-5-21-111-222-333-1001 no "+Environment.MachineName);
+            Check(scrubbed.IndexOf(user,StringComparison.OrdinalIgnoreCase)<0||user.Length<=2,"O nome do usuário ficou no log exportado: "+scrubbed);
+            Check(scrubbed.IndexOf("Maria Souza",StringComparison.Ordinal)<0&&scrubbed.IndexOf(@"\outra\",StringComparison.Ordinal)<0,"A pasta de outra conta ficou no log exportado: "+scrubbed);
+            Check(scrubbed.IndexOf("ana.silva",StringComparison.Ordinal)<0&&scrubbed.IndexOf("S-1-5-21",StringComparison.Ordinal)<0,"E-mail ou id de conta ficaram no log exportado: "+scrubbed);
+            results.Add("PASS: o log exportado tira usuário, pastas de contas, nome do computador, e-mails e ids de conta.");
+        }
         var tintMethod=typeof(Artwork).GetMethod("Tint",BindingFlags.NonPublic|BindingFlags.Static);
         using(var green=new Bitmap(148,222)){
             using(var g=Graphics.FromImage(green))g.Clear(Color.Lime);

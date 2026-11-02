@@ -178,18 +178,50 @@ public static class Updater {
         }
     }
 
-    // Starts a hidden helper that waits for this process (and its /guard companion) to exit, runs the MSI and
-    // opens the app again. If the install fails, the old executable is still there and is started instead.
+    // The installed program cannot replace itself while it runs, so a copy of it (in the app's data folder) does the job:
+    // it waits for this process and its /guard companion to exit, runs the MSI and opens the app again. No PowerShell and no
+    // encoded script, which is also what security tools flag. If the helper cannot start, nothing has been closed yet.
     public static void Install(string msi, int pid) {
         string exe = Application.ExecutablePath;
-        string script =
-            "$ErrorActionPreference='SilentlyContinue';" +
-            "Wait-Process -Id " + pid + " -Timeout 30;" +
-            "Get-Process -Name ResMode | Wait-Process -Timeout 20;" +
-            "Start-Process -FilePath msiexec.exe -ArgumentList '/i','\"" + msi.Replace("'", "''") + "\"','/passive','/norestart' -Wait;" +
-            "if(Test-Path -LiteralPath '" + exe.Replace("'", "''") + "'){Start-Process -FilePath '" + exe.Replace("'", "''") + "'}"; // no /background: the window opens again after the update
-        string powershell = Path.Combine(Environment.SystemDirectory, @"WindowsPowerShell\v1.0\powershell.exe");
-        Process.Start(new ProcessStartInfo(powershell, "-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script))) { UseShellExecute = false, CreateNoWindow = true });
+        string dir = Path.Combine(Store.Root, "update", "helper");
+        Directory.CreateDirectory(dir);
+        string helper = Path.Combine(dir, AppInfo.ExeName);
+        File.Copy(exe, helper, true);
+        Process.Start(new ProcessStartInfo(helper, "/applyupdate " + pid + " \"" + msi + "\" \"" + exe + "\"") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = dir });
+    }
+
+    // Runs in the helper copy ("ResMode.exe /applyupdate <pid> <msi> <installed exe>").
+    public static void RunHelper(int pid, string msi, string exe) {
+        string updates = Path.GetFullPath(Path.Combine(Store.Root, "update")) + Path.DirectorySeparatorChar;
+        // Only an installer the app itself downloaded into its own folder is ever run.
+        if (!Path.GetFullPath(msi).StartsWith(updates, StringComparison.OrdinalIgnoreCase) || !msi.EndsWith(".msi", StringComparison.OrdinalIgnoreCase) || !File.Exists(msi)) {
+            Store.Log("Atualização recusada: o instalador não está na pasta de atualizações.", LogKind.Error);
+            return;
+        }
+        try { using (var p = Process.GetProcessById(pid)) p.WaitForExit(30000); } catch { }
+        string self = Application.ExecutablePath;
+        int me = Process.GetCurrentProcess().Id;
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (DateTime.UtcNow < deadline && OtherCopyRunning(me, self)) System.Threading.Thread.Sleep(300);
+        int code = -1;
+        try {
+            using (var p = Process.Start(new ProcessStartInfo("msiexec.exe", "/i \"" + msi + "\" /passive /norestart") { UseShellExecute = false })) { p.WaitForExit(); code = p.ExitCode; }
+        } catch (Exception e) { Store.Log("Não deu para rodar o instalador: " + e.Message, LogKind.Error); }
+        if (code == 0 || code == 3010) Store.Log("Atualização instalada.", LogKind.System);
+        else Store.Log("O instalador terminou com o código " + code + "; o app anterior continua instalado.", LogKind.Error);
+        // No /background: the window opens again after the update.
+        if (File.Exists(exe)) try { Process.Start(new ProcessStartInfo(exe) { UseShellExecute = false }); } catch { }
+    }
+
+    static bool OtherCopyRunning(int me, string self) {
+        foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(AppInfo.ExeName)))
+            using (p) {
+                if (p.Id == me) continue;
+                string path = Native.ExePath(p.Id);
+                if (path != null && String.Equals(path, self, StringComparison.OrdinalIgnoreCase)) continue; // another helper
+                return true;
+            }
+        return false;
     }
 
     public static void OpenPage(UpdateOffer offer) {

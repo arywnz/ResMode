@@ -27,6 +27,7 @@ public static class Program {
             case "/shellguard": ShellRefresh.Guard(Int32.Parse(arg),args[2]); return;
             case "/shellrefresh": ShellRefresh.TryRun(System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(arg))); return;
             case "/restore": Store.Restore(); return;
+            case "/applyupdate": if (args.Length >= 4) Updater.RunHelper(Int32.Parse(arg), args[2], args[3]); return;
         }
         Run(args.Contains("/background"));
     }

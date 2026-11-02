@@ -62,7 +62,7 @@ public static class LogExport {
     static string VideoAdapters() {
         var found = new List<string>();
         try {
-            using (var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11cd-bfd1-08002be10318}"))
+            using (var cls = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"))
                 foreach (string name in cls.GetSubKeyNames().Where(n => n.Length == 4 && n.All(Char.IsDigit)))
                     using (var k = cls.OpenSubKey(name)) {
                         string desc = k == null ? null : Convert.ToString(k.GetValue("DriverDesc"));
@@ -84,14 +84,23 @@ public static class LogExport {
         return t.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture) + "  " + tag.PadRight(12) + rest;
     }
 
-    // The file is meant to be shared, so the Windows user name stays out of it.
+    // The file is meant to be shared, so what identifies the person or the PC stays out of it: the user name, the profile
+    // folder (and any other account's folder under Users), the computer name, e-mail addresses and Windows account ids.
     static string Anonymize(string line) {
         string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         if (!String.IsNullOrEmpty(profile)) line = Regex.Replace(line, Regex.Escape(profile), "%USERPROFILE%", RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"(?i)([A-Z]:\\Users\\)[^\\/\s""'<>|]+", "$1usuário");
         if (!String.IsNullOrEmpty(Environment.UserName) && Environment.UserName.Length > 2)
             line = Regex.Replace(line, Regex.Escape(Environment.UserName), "usuário", RegexOptions.IgnoreCase);
+        if (!String.IsNullOrEmpty(Environment.MachineName) && Environment.MachineName.Length > 2)
+            line = Regex.Replace(line, Regex.Escape(Environment.MachineName), "computador", RegexOptions.IgnoreCase);
+        line = Regex.Replace(line, @"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}", "<e-mail>");
+        line = Regex.Replace(line, @"S-1-5-21(-\d+){3,5}", "<id-da-conta>");
         return line;
     }
+
+    // Public for the tests: the same scrubbing, on any text.
+    public static string Scrub(string text) { return Anonymize(text); }
 
     // Opens the folder with the file already selected, ready to copy or send.
     public static void Reveal(string file) {
