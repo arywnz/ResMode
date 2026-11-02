@@ -196,7 +196,7 @@ public class AppContext : ApplicationContext {
                         Store.Log(e.Message, LogKind.Error);
                         if (lastError != e.Message) {
                             tray.ShowBalloonTip(7000, "Resolução de jogo indisponível", e.Message, ToolTipIcon.None);
-                            Notify("Resolução indisponível", e.Message, LogKind.Error);
+                            Notify("Não consegui ligar a resolução", e.Message, LogKind.Error);
                             lastError = e.Message;
                         }
                     }
@@ -334,8 +334,10 @@ public class AppContext : ApplicationContext {
     void ReportLibraryChange(List<string> added, List<string> removed) {
         foreach (string n in added) Store.Log("Novo jogo na biblioteca: " + n + ".", LogKind.Library);
         foreach (string n in removed) Store.Log("Saiu da biblioteca: " + n + ".", LogKind.Library);
-        if (added.Count > 0) Notify(added.Count == 1 ? "Jogo novo na biblioteca" : added.Count + " jogos novos na biblioteca", String.Join(", ", added), LogKind.Library);
-        if (removed.Count > 0) Notify(removed.Count == 1 ? "Jogo removido" : removed.Count + " jogos removidos", String.Join(", ", removed) + (removed.Count == 1 ? " foi desinstalado." : " foram desinstalados."), LogKind.Library);
+        if (added.Count > 0) Notify(added.Count == 1 ? "Achei um jogo novo" : "Achei " + added.Count + " jogos novos",
+            added.Count == 1 ? added[0] + " já está na sua biblioteca." : String.Join(", ", added) + " já estão na sua biblioteca.", LogKind.Library);
+        if (removed.Count > 0) Notify(removed.Count == 1 ? "Um jogo saiu da biblioteca" : removed.Count + " jogos saíram da biblioteca",
+            removed.Count == 1 ? removed[0] + " foi desinstalado, então tirei da lista." : String.Join(", ", removed) + " foram desinstalados, então tirei da lista.", LogKind.Library);
     }
 
     // In-app notifications shown under the bell; kept for this session only.
@@ -403,7 +405,7 @@ public class AppContext : ApplicationContext {
         if (result.Download) { FinishDownload(result); return; }
         if (result.Error != null) {
             Store.Log("Não deu para procurar atualização: " + result.Error.Message, LogKind.System);
-            if (updateManual) SayUpdate("Sem resposta do GitHub.");
+            if (updateManual) SayUpdate("O GitHub não respondeu agora. Tente de novo daqui a pouco.");
             return;
         }
         if (result.Offer == null) {
@@ -415,7 +417,7 @@ public class AppContext : ApplicationContext {
         downloadedUpdate = null;
         Store.Log("Versão " + Update.Version + " disponível.", LogKind.System);
         UpdateMessage = "Versão " + Update.Version + " disponível.";
-        updateNotice = Notify("Nova versão disponível", AppInfo.Name + " " + Update.Version + " já saiu. Você está na " + AppInfo.Release + ".", LogKind.Library);
+        updateNotice = Notify("Tem uma versão nova do " + AppInfo.Name, "A " + Update.Version + " já saiu e você está na " + AppInfo.Release + ". É só tocar em Atualizar agora.", LogKind.Library);
         updateNotice.ActionText = UpdateInPlace ? "Atualizar agora" : "Ver no GitHub";
         updateNotice.Action = delegate {
             try { InstallUpdate(); } catch (Exception e) { SayUpdate(e.Message); }
@@ -425,7 +427,7 @@ public class AppContext : ApplicationContext {
             config.AnnouncedUpdate = Update.Version;
             Store.SaveSettings(config);
             updateBalloon = true;
-            tray.ShowBalloonTip(8000, "Nova versão do " + AppInfo.Name, Update.Version + " já saiu. Clique para ver.", ToolTipIcon.None);
+            tray.ShowBalloonTip(8000, "Tem uma versão nova do " + AppInfo.Name, "A " + Update.Version + " já saiu. Clique aqui para atualizar.", ToolTipIcon.None);
         }
     }
 
@@ -472,7 +474,8 @@ public class AppContext : ApplicationContext {
         if (config.CompetitiveNotified || !config.SkipCompetitive) return;
         var names = config.Games.Where(g => Competitive.Is(g.Name)).Select(g => g.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (names.Count == 0) return;
-        Notify("Jogos competitivos ficam de fora", String.Join(", ", names) + (names.Count == 1 ? " continua" : " continuam") + " na resolução normal, para não perder FPS. Dá para mudar nas configurações.", LogKind.Library);
+        Notify(names.Count == 1 ? "Deixei um jogo competitivo de fora" : "Deixei " + names.Count + " jogos competitivos de fora",
+            String.Join(", ", names) + (names.Count == 1 ? " fica" : " ficam") + " na resolução normal para você não perder FPS. Se preferir, dá para mudar nas Configurações.", LogKind.Library);
         config.CompetitiveNotified = true;
         Store.SaveSettings(config);
     }
@@ -517,7 +520,7 @@ public class AppContext : ApplicationContext {
         FillDisplayDefaults(false);
         if (config.Width > 0 && before == 0) {
             SaveConfiguration();
-            Notify("Resolução encontrada", config.Width + " × " + config.Height + " vai ser usada nos jogos. Dá para trocar nas Configurações.", LogKind.Library);
+            Notify("Achei uma resolução maior", "Vou usar " + config.Width + " × " + config.Height + " nos seus jogos. Se preferir outra, é só trocar nas Configurações.", LogKind.Library);
             return config.Width + " × " + config.Height + " encontrada.";
         }
         return config.Width > 0 ? "Já está tudo certo: " + config.Width + " × " + config.Height + "." : "Ainda não aparece nenhuma resolução maior. Confira se aplicou a mudança no painel.";
@@ -696,8 +699,8 @@ public class AppContext : ApplicationContext {
         diagnoseAt = DateTime.Now.AddSeconds(15);
         // No icon: Windows then shows only the app's own icon in the header, instead of a generic blue "i".
         string game = RunningNames.FirstOrDefault();
-        Announce((game ?? "Jogo") + " em " + after.width + " × " + after.height,
-            "No jogo, use " + after.width + " × " + after.height + " (em janela sem borda ocupa a tela toda). Volta para " + deskW + " × " + deskH + " ao fechar.", 2500);
+        Announce((game ?? "O jogo") + ": tela em " + after.width + " × " + after.height,
+            "Nas opções de vídeo, escolha " + after.width + " × " + after.height + ": em janela sem borda ele ocupa a tela toda. Quando você fechar, volto para " + deskW + " × " + deskH + ".", 2500);
     }
 
     public bool WindowVisible { get { return dashboard != null && !dashboard.IsDisposed && dashboard.Visible && dashboard.WindowState != FormWindowState.Minimized; } }
@@ -712,7 +715,7 @@ public class AppContext : ApplicationContext {
         bool wasActive = active;
         bool ok = Store.Restore();
         active = File.Exists(Store.State);
-        if (!ok && !restoreFailed) Notify("A resolução não voltou ao normal", "O monitor não aceitou a troca. O app continua tentando; se não voltar, gere o log nas Configurações.", LogKind.Error);
+        if (!ok && !restoreFailed) Notify("A resolução não voltou ao normal", "O monitor não aceitou a troca de volta. Vou continuar tentando. Se não voltar sozinha, gere o log nas Configurações.", LogKind.Error);
         restoreFailed = !ok;
         if (ok) {
             emptySince = DateTime.MinValue;

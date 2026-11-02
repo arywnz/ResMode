@@ -104,7 +104,11 @@ public class NoticeList : Painted {
         maximumHeight = Theme.S(540);
         Width = Theme.S(460);
         clear = new FlatButton { Text = "Limpar tudo", Kind = ButtonKind.Secondary, Height = Theme.S(30), Font = Theme.Body(9.5f, true), AccessibleName = "Limpar todas as notificações" };
-        clear.Click += delegate { this.clearNotices(); RefreshNotices(); };
+        clear.Click += delegate {
+            // The rows slide out first; the list is emptied once they are gone.
+            clear.Enabled = false;
+            body.PlayClear(delegate { this.clearNotices(); RefreshNotices(); });
+        };
         body = new NoticeBody { BackColor = BackColor, AccessibleName = "Lista de notificações", AccessibleRole = AccessibleRole.List };
         Controls.Add(body);
         Controls.Add(clear);
@@ -158,7 +162,7 @@ public class NoticeList : Painted {
         using (var head = Theme.Body(12, true))
             Theme.DrawText(g, "Notificações", head, Theme.Text, new Rectangle(pad, Theme.S(9), Math.Max(1, clear.Left - pad - Theme.S(10)), Theme.S(27)));
         using (var small = Theme.Body(9))
-            Theme.DrawText(g, count == 0 ? "Você está em dia" : count == 1 ? "1 notificação nesta sessão" : count + " notificações nesta sessão", small, Theme.Muted, new Rectangle(pad, Theme.S(36), Width - pad * 2, Theme.S(22)));
+            Theme.DrawText(g, count == 0 ? "Você está em dia" : count == 1 ? "1 aviso desde que o app abriu" : count + " avisos desde que o app abriu", small, Theme.Muted, new Rectangle(pad, Theme.S(36), Width - pad * 2, Theme.S(22)));
         using (var pen = new Pen(Theme.Border))
             g.DrawLine(pen, Theme.S(10), HeaderHeight - Theme.S(4), Width - Theme.S(10), HeaderHeight - Theme.S(4));
     }
@@ -219,11 +223,47 @@ public class NoticeList : Painted {
             if (disposing) actionFont.Dispose();
             base.Dispose(disposing);
         }
+        // Rows arrive one after another (the whole list when it opens, only the newcomers afterwards) and a clear plays
+        // them out to the right, so the list never just blinks.
+        readonly System.Diagnostics.Stopwatch motionClock = new System.Diagnostics.Stopwatch();
+        List<AppContext.Notice> arriving = new List<AppContext.Notice>();
+        bool clearing;
+        const double RowMs = 280, StaggerMs = 55;
+
+        void RunMotion(Action done) {
+            int count = Math.Max(1, Math.Min(rows.Count, 8));
+            motionClock.Restart();
+            Motion.Run(Tuple.Create(this, "rows"), RowMs + (count - 1) * StaggerMs, e => { if (!IsDisposed) Invalidate(); }, delegate {
+                motionClock.Stop();
+                if (done != null) done();
+                if (!IsDisposed) Invalidate();
+            });
+        }
+
+        // 0..1 for a row: how far its arrival (or exit) has got.
+        float Progress(int index, bool leaving) {
+            double elapsed = motionClock.Elapsed.TotalMilliseconds - Math.Min(index, 7) * StaggerMs;
+            return Motion.EaseOut((float)Math.Max(0, Math.Min(1, elapsed / RowMs)));
+        }
+
+        public void PlayClear(Action done) {
+            if (rows.Count == 0 || clearing) { if (done != null) done(); return; }
+            clearing = true;
+            RunMotion(delegate { clearing = false; if (done != null) done(); });
+        }
+
         public void SetNotices(List<AppContext.Notice> items) {
+            bool first = !Initialized;
+            var added = first ? items : items.Where(n => !notices.Contains(n)).ToList();
             notices = items;
             Initialized = true;
             measuredWidth = -1;
             ScrollTop();
+            if (added.Count > 0 && !clearing) {
+                arriving = added;
+                MeasureContent(Width);
+                RunMotion(delegate { arriving = new List<AppContext.Notice>(); });
+            }
         }
 
         public int MeasureContent(int width) {
@@ -278,7 +318,7 @@ public class NoticeList : Painted {
             if (notices.Count == 0) {
                 using (var icon = Theme.Glyphs(24))
                     Theme.DrawGlyph(g, "\uEA8F", icon, Theme.Faint, new Rectangle(0, Theme.S(22), Width, Theme.S(48)));
-                Theme.DrawText(g, "Sem notificações", Font, Theme.Muted, new Rectangle(0, Theme.S(82), Width, Theme.S(28)), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                Theme.DrawText(g, "Tudo tranquilo por aqui", Font, Theme.Muted, new Rectangle(0, Theme.S(82), Width, Theme.S(28)), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
                 return;
             }
             int textWidth = Math.Max(1, Width - TextLeft - Theme.S(24));
@@ -288,6 +328,13 @@ public class NoticeList : Painted {
                 foreach (var row in rows) {
                     int y = row.Top - (int)offset;
                     if (y + row.Height < 0 || y > Height) continue;
+                    // Arrival: rise and fade in. Clear: slide right and fade out.
+                    float vis = 1;
+                    int dx = 0, dy = 0, slot = rows.IndexOf(row);
+                    if (clearing) { float p = Progress(slot, true); vis = 1 - p; dx = (int)(p * Theme.S(70)); }
+                    else if (arriving.Contains(row.Notice)) { float p = Progress(arriving.IndexOf(row.Notice), false); vis = p; dy = (int)((1 - p) * Theme.S(14)); }
+                    var movedState = g.Save();
+                    g.TranslateTransform(dx, dy);
                     var card = new Rectangle(0, y, Width - Theme.S(12), row.Height);
                     Theme.Fill(g, card, Theme.S(10), Theme.Surface);
                     var color = Kinds.Color(row.Notice.Kind);
@@ -311,6 +358,9 @@ public class NoticeList : Painted {
                         Theme.Fill(g, pill, pill.Height / 2f, hot ? Theme.Accent : Theme.Mix(Theme.Surface, Theme.Accent, .16f));
                         TextRenderer.DrawText(g, n.ActionText ?? "", actionFont, pill, hot ? Theme.AccentInk : Theme.Accent, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix);
                     }
+                    // Fade by veiling toward the list's own colour (the rows are painted, not layered windows).
+                    if (vis < 1) using (var veil = new SolidBrush(Color.FromArgb((int)((1 - vis) * 255), BackColor))) g.FillRectangle(veil, Rectangle.Inflate(card, Theme.S(2), Theme.S(2)));
+                    g.Restore(movedState);
                 }
             }
             PaintScrollbar(g);
@@ -604,13 +654,17 @@ public class ToastCard : Painted {
         Visible = true;
         BringToFront();
         t = 0;
-        Motion.Run(Tuple.Create(this, "toast"), Motion.Normal, v => { t = v; Invalidate(); });
+        Motion.Run(Tuple.Create(this, "toast"), Motion.Normal + 60, v => { t = v; Slide(); Invalidate(); });
         hide.Stop();
         hide.Start();
     }
 
+    // Where the toast rests; it rises into place from a little below and sinks back out.
+    public Point Home { get; set; }
+    void Slide() { if (Visible) Location = new Point(Home.X, Home.Y + (int)((1 - t) * Theme.S(16))); }
+
     void Dismiss() {
-        Motion.Run(Tuple.Create(this, "toast"), Motion.Fast, v => { t = 1 - v; Invalidate(); }, delegate { Visible = false; });
+        Motion.Run(Tuple.Create(this, "toast"), Motion.Fast + 40, v => { t = 1 - v; Slide(); Invalidate(); }, delegate { Visible = false; });
     }
 
     protected override void OnMouseClick(MouseEventArgs e) { hide.Stop(); Dismiss(); base.OnMouseClick(e); }

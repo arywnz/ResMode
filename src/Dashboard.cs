@@ -98,7 +98,10 @@ public class Dashboard : Form {
         PlaceToast();
     }
 
-    void PlaceToast() { toast.Location = new Point(ClientSize.Width - toast.Width - Theme.S(24), ClientSize.Height - toast.Height - Theme.S(24)); }
+    void PlaceToast() {
+        toast.Home = new Point(ClientSize.Width - toast.Width - Theme.S(24), ClientSize.Height - toast.Height - Theme.S(24));
+        toast.Location = new Point(toast.Home.X, toast.Home.Y + Theme.S(16)); // starts a little low; the toast rises into Home
+    }
     string runningKey = "";
     bool closing;
 
@@ -222,7 +225,7 @@ public class Dashboard : Form {
     protected override void OnResize(EventArgs e) {
         base.OnResize(e);
         if (WindowState == FormWindowState.Minimized) Native.TrimMemory();
-        else if (toast.Visible) PlaceToast();
+        else if (toast.Visible) { toast.Home = new Point(ClientSize.Width - toast.Width - Theme.S(24), ClientSize.Height - toast.Height - Theme.S(24)); toast.Location = toast.Home; }
     }
 
     // Closing fades the window out first.
@@ -305,7 +308,7 @@ public class Dashboard : Form {
 
     void RefreshLibrary() {
         if (owner.RunningNames.Count > 0) {
-            owner.Notify("Biblioteca atualiza depois do jogo", "Com um jogo aberto, a busca espera ele fechar para não pesar.", LogKind.Library);
+            owner.Notify("Atualizo a biblioteca depois do jogo", "Com um jogo aberto prefiro esperar ele fechar, para não deixar o PC mais pesado.", LogKind.Library);
             UpdateView();
             return;
         }
