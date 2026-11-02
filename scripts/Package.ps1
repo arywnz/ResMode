@@ -1,7 +1,7 @@
 param(
     [string]$BinaryDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist'),
     [string]$OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'releases\package'),
-    [string]$ArchivePath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'releases\ResMode-0.2.2-alpha.21-win-x64-unsigned.zip')
+    [string]$ArchivePath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'releases\ResMode-0.2.2-alpha.22-win-x64-unsigned.zip')
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
