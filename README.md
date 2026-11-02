@@ -1,49 +1,106 @@
 # ResMode
 
-Use uma resolução maior nos jogos sem precisar deixar o Windows assim o dia inteiro. O ResMode acompanha os jogos escolhidos, muda a resolução do monitor e volta ao normal quando você termina de jogar.
+**Seu monitor é 1080p, sua placa de vídeo aguenta mais e o Windows não colabora.**
 
-## Baixar
+O ResMode nasceu de um problema extremamente específico: querer jogar em uma resolução maior sem precisar transformar o desktop inteiro num experimento científico toda vez que abre um jogo.
 
-### [⬇ Baixar ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.16/ResMode-0.2.2-alpha.16-win-x64.msi)
+Ativou o DLDSR, foi jogar em 1440p ou 4K, terminou a jogatina e teve que voltar nas configurações do Windows para desfazer a brincadeira?
 
-Para **Windows 10 ou 11, de 64 bits**. Esta é uma versão de testes. [Outras versões e arquivos](https://github.com/arywnz/ResMode/releases).
+Pois é. Eu também achei uma merda.
 
-O aplicativo é gratuito e não exige comprar um certificado. O instalador ainda **não tem assinatura digital**, então alguns Windows podem mostrar um aviso ou bloquear a instalação ou a execução. Isso depende das proteções ativas em cada PC; o MSI não remove essa restrição.
+## Mas que desgraça esse programa faz?
 
-## Como usar
+É simples:
 
-1. Baixe o MSI e siga a instalação. Se já usa o ResMode, feche-o antes de atualizar, quando nenhum jogo estiver aberto.
-2. Abra o ResMode pelo atalho e escolha o monitor e a resolução de jogo nas configurações.
-3. Confira a biblioteca e marque os jogos que quer acompanhar. Você também pode adicionar um jogo manualmente.
+1. Você deixa o Windows na resolução normal, como uma pessoa civilizada.
+2. Abre um jogo que configurou no ResMode.
+3. O programa detecta o jogo e muda a resolução automaticamente.
+4. Você joga com a resolução maior que escolheu.
+5. Fecha o jogo e o ResMode devolve o desktop ao normal.
 
-A resolução escolhida precisa estar disponível no driver da sua placa de vídeo. O ResMode não cria resoluções que o monitor ou o driver não oferecem.
+**Pronto. Era só isso que eu queria.**
 
-Enquanto o jogo estiver aberto, a área de trabalho também pode ficar na resolução de jogo, inclusive durante Alt+Tab. Ela volta ao normal ao encerrar a sessão. DLSS e outras opções de qualidade continuam nas configurações de cada jogo.
+Infelizmente, o Windows achou que seria engraçado complicar as coisas, então agora o programa também precisa cuidar das janelas, dos outros monitores e de umas situações que eu preferia nunca ter descoberto.
 
-## O que você encontra no app
+## Pra quem é essa geringonça?
 
-- Biblioteca organizada por launcher, com capas e opção de abrir o jogo.
-- Jogos adicionados e removidos da biblioteca acompanhados automaticamente.
-- Lista de jogos ignorados que continua salva depois de reiniciar o PC.
-- Escolha do monitor, início com o Windows e registro de atividade, com um botão que gera o log em .txt (Documentos/ResMode) para enviar quando precisar de ajuda.
-- Aviso quando sai uma versão nova no GitHub, com botão para baixar e instalar sem abrir o navegador. Dá para desligar em Configurações → Versão.
-- Restauração da resolução e tentativa de manter as outras janelas no lugar.
-- Opção de recuperar a nitidez da barra de tarefas ao voltar do jogo. Ela reinicia a interface do Explorer e fica desligada por padrão.
+- **Usuários de DLDSR/DSR da NVIDIA:** para quem tem um monitor humilde, mas quer renderizar jogos em resoluções maiores.
+- **Usuários de VSR da AMD:** porque a NVIDIA não é dona da brincadeira.
+- **Quem usa dois ou mais monitores:** e já viu o Windows reorganizar tudo como se tivesse jogado os monitores dentro de um liquidificador.
+- **Quem tem preguiça de configurar tudo manualmente:** provavelmente o público-alvo mais importante.
 
-A função de conquistas foi removida. O ResMode não modifica arquivos dos jogos, não altera saves e não injeta código neles. O comportamento das janelas ainda pode variar conforme o jogo, o driver e os outros programas abertos.
+Se você joga sempre na resolução nativa e está feliz assim, talvez não precise disso. Aproveite sua paz.
 
-## Seus dados
+## O que tem dentro?
 
-O ResMode não tem conta própria, anúncios nem envio automático de logs. A biblioteca, as preferências e o histórico ficam no seu PC e são protegidos com a criptografia do próprio Windows, ligada ao seu usuário. Não há uma senha ou chave compartilhada dentro do instalador.
+- Biblioteca de jogos com capas, busca e organização por launcher.
+- Detecção de jogos da Steam, Epic, GOG, Ubisoft, EA, Battle.net, Riot e Rockstar.
+- Adição manual de jogos que o programa não encontrar.
+- Troca automática de resolução ao abrir e fechar os jogos selecionados.
+- Suporte a múltiplos monitores, com opção de centralizar o segundo monitor.
+- Tentativa de restaurar as posições das janelas depois da jogatina.
+- Recuperação da resolução original caso o aplicativo seja encerrado inesperadamente.
+- Histórico de atividade para descobrir qual foi a última gracinha que o Windows aprontou.
+- Atualizações pelo próprio aplicativo.
 
-Você pode instalar o app normalmente em outros PCs. Cada instalação cria seus próprios dados; copiar os arquivos protegidos de um usuário ou computador para outro não é uma forma de transferir as configurações. A proteção também não impede o acesso por outro programa que já esteja rodando com a sua conta do Windows.
+Tudo isso sem precisar instalar um launcher para abrir outro launcher que finalmente abre o jogo.
 
-Para identificar quais itens da Steam são jogos, o app pode consultar a loja com o número público do item. Para avisar de versões novas, ele consulta a lista de releases do GitHub (sem enviar nada seu) ao abrir e a cada 15 minutos; o instalador só é executado se o SHA-256 baixado for o publicado no release. As capas e o tempo de jogo são lidos dos arquivos locais da Steam. [Veja os detalhes de privacidade](PRIVACY.md).
+## Como instalar
 
-## Remover ou pedir ajuda
+**[Baixar o ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.15/ResMode-0.2.2-alpha.15-win-x64.msi)**
 
-Para desinstalar o MSI, use **Configurações → Aplicativos → ResMode**. Feche o ResMode primeiro. Suas configurações ficam guardadas para uma futura reinstalação; para apagá-las também, remova a pasta `%LOCALAPPDATA%\ResMode` depois de fechar o app.
+Funciona no Windows 10 e 11 de 64 bits.
 
-Encontrou um problema? [Abra uma issue](https://github.com/arywnz/ResMode/issues) contando o que aconteceu. Revise qualquer histórico antes de compartilhar: ele pode mostrar nomes de jogos e caminhos de pastas.
+Instale, abra o programa, escolha seu monitor e a resolução desejada. Depois, marque os jogos que quer acompanhar.
 
-O código é aberto e usa a [licença MIT](LICENSE). As fontes Geist mantêm sua [própria licença](THIRD_PARTY_NOTICES.md). Para compilar ou contribuir, veja [CONTRIBUTING.md](CONTRIBUTING.md). Informações sobre [segurança](SECURITY.md) e [assinatura digital](CODE_SIGNING.md).
+**Atenção, criatura:** você precisa ativar o DLDSR, DSR, VSR ou outra resolução compatível no driver da placa de vídeo antes. O ResMode não tira resolução do além.
+
+O instalador ainda não possui assinatura digital. Portanto, o Windows pode reclamar ou bloquear a instalação. O código está disponível neste repositório para inspeção.
+
+## Algumas verdades inconvenientes
+
+**Isso aumenta FPS?**
+
+Não, meu consagrado. Renderizar mais pixels normalmente exige *mais* da placa de vídeo. O objetivo aqui é facilitar o uso de resoluções maiores, não fazer uma GTX 750 Ti virar uma RTX 5090.
+
+**Funciona com qualquer jogo?**
+
+A ideia é funcionar com a maior quantidade possível, mas alguns jogos têm opiniões muito fortes sobre como o monitor deve funcionar. O comportamento pode variar conforme o jogo, o modo de exibição e o driver.
+
+**O Alt+Tab funciona?**
+
+O ResMode tenta manter a resolução de jogo durante a sessão, inclusive ao alternar janelas. Isso significa que o próprio desktop também pode permanecer na resolução maior enquanto você joga.
+
+**Tem que pagar?**
+
+Não. É gratuito e de código aberto.
+
+**Vai mexer nos arquivos dos meus jogos?**
+
+Não. O ResMode não modifica jogos, saves nem injeta código nos processos.
+
+## Privacidade, porque ninguém merece mais um programa bisbilhoteiro
+
+Sem conta. Sem anúncios. Sem telemetria enviando sua vida para algum servidor misterioso.
+
+As configurações, a biblioteca e os registros ficam no seu computador, com proteção de dados locais pelo Windows DPAPI.
+
+O aplicativo pode consultar a Steam para identificar jogos e o GitHub para verificar atualizações. Os logs só são exportados quando você solicita.
+
+Mais detalhes em [PRIVACY.md](PRIVACY.md).
+
+## Ainda estamos na fase das experiências
+
+O ResMode está em **alpha**.
+
+Isso significa que tem funcionalidades prontas, testes automatizados e também a possibilidade de algum jogo decidir que não quer colaborar.
+
+Encontrou um bug? [Abra uma issue](https://github.com/arywnz/ResMode/issues). Explique o que aconteceu e, se possível, envie o log gerado pelo aplicativo, depois de conferir se não tem informações pessoais.
+
+Se quiser compilar, veja [CONTRIBUTING.md](CONTRIBUTING.md).
+
+Licença [MIT](LICENSE). As fontes Geist possuem licença própria, descrita em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+---
+
+**ResMode — porque trocar a resolução manualmente toda vez que abre um jogo já estava virando profissão.**
