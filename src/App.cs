@@ -210,6 +210,7 @@ public class AppContext : ApplicationContext {
             }
 
             CheckLibraryChanges();
+            if (diagnoseAt != DateTime.MinValue && DateTime.Now >= diagnoseAt) { diagnoseAt = DateTime.MinValue; if (active && games.Count > 0) LogGameWindow(); }
             if (catalogTask != null && catalogTask.IsCompleted) {
                 if (catalogTask.Status == TaskStatus.RanToCompletion) {
                     string before = LibrarySignature();
@@ -508,6 +509,23 @@ public class AppContext : ApplicationContext {
     // other monitor). While the game is still open and the screen has gone back to the desktop mode, put the game mode
     // back. It waits a couple of seconds so it never fights the game's own mode change, and gives up after a few
     // tries in a short time instead of looping.
+    // A few seconds into a session, one history line says how the game's window sits on the screen. When a game shows up
+    // as a small window instead of filling the screen, this is what tells whether it is the mode, the window size or the monitor.
+    DateTime diagnoseAt = DateTime.MinValue;
+
+    void LogGameWindow() {
+        try {
+            string device = Device();
+            var pids = DesktopLayout.GamePids(config.Games);
+            var mode = Native.Current(device);
+            var windows = DesktopLayout.Capture(device, true, null, true).Where(w => pids.Contains(w.Pid)).ToList();
+            if (windows.Count == 0) { Store.Log("Janela do jogo: nenhuma janela visível ainda (tela em " + mode.width + " × " + mode.height + " a " + mode.hz + " Hz).", LogKind.Game); return; }
+            foreach (var w in windows.OrderByDescending(x => x.Window.Width * (long)x.Window.Height).Take(2))
+                Store.Log("Janela do jogo: " + w.Window.Width + " × " + w.Window.Height + " em " + w.Window.Left + "," + w.Window.Top + (w.Maximized ? ", maximizada" : "") +
+                    ". Tela: " + mode.width + " × " + mode.height + " a " + mode.hz + " Hz, escala da janela " + (w.Dpi * 100 / 96) + "%.", LogKind.Game);
+        } catch (Exception e) { Store.Log("Erro ao ler a janela do jogo: " + e.Message, LogKind.Error); }
+    }
+
     DateTime revertedSince = DateTime.MinValue, modeWindow = DateTime.MinValue;
     int modeRestores;
     bool modeGaveUp;
@@ -600,6 +618,7 @@ public class AppContext : ApplicationContext {
         if (config.CenterSecondMonitor && before != null) CenterNeighbours(device, before, others);
         DesktopLayout.Settle(windows.Where(w => !String.Equals(w.Device, device, StringComparison.OrdinalIgnoreCase)).ToList());
         Store.Log("Resolução de jogo ligada: " + after.width + " × " + after.height + " a " + after.hz + " Hz.", LogKind.Game);
+        diagnoseAt = DateTime.Now.AddSeconds(15);
         // No icon: Windows then shows only the app's own icon in the header, instead of a generic blue "i".
         string game = RunningNames.FirstOrDefault();
         tray.ShowBalloonTip(2500, (game ?? "Jogo") + " em " + after.width + " × " + after.height,
