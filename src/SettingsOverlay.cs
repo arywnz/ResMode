@@ -123,6 +123,10 @@ public class SettingsOverlay : Modal {
         foreach (Control b in generalColumn.Controls) { b.Location = new Point(0, y); y += b.Height; }
         generalColumn.Height = y + Theme.S(12);
         general.Refit();
+        // The card is as tall as its content (title, rows, footer), so a window that has the room shows no scrollbar;
+        // when it does not (a small window), the card is capped at the window and the rows scroll.
+        int wanted = Theme.S(76) + generalColumn.Height + Theme.S(14) + Theme.S(36) + Theme.S(20);
+        if (MaxCard.Height != wanted) { MaxCard = new Size(MaxCard.Width, wanted); if (IsHandleCreated) PerformLayout(); }
     }
 
     // A section: its name in a narrow left column and its rows on the right, with a rule above.
