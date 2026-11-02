@@ -514,7 +514,8 @@ public class SmoothScroll : Panel {
 public class GameGrid : ScrollSurface {
     List<LibraryGame> games = new List<LibraryGame>();
     public Func<LibraryGame, bool> IsRunning = g => false;
-    public string EmptyText = "";
+    public string EmptyText = "", EmptyTitle = "";
+    Image emptyIcon;
     public event Action<LibraryGame, Rectangle> MenuRequested; // card bounds, in grid coordinates
     public event Action<LibraryGame, Point> PlayRequested;
     readonly Dictionary<string, float> cardHover = new Dictionary<string, float>();
@@ -837,7 +838,14 @@ public class GameGrid : ScrollSurface {
         g.Clear(BackColor);
         Theme.Smooth(g);
         if (games.Count == 0) {
-            using (var f = Theme.Body(10.5f)) Theme.DrawText(g, EmptyText, f, Theme.Muted, new Rectangle(0, 0, Width, Theme.S(120)), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
+            // Empty library or no match: the app's mark, a short title and one line on what to do next.
+            int s = Theme.S(76), top = Theme.S(56);
+            if (emptyIcon == null) try { emptyIcon = Theme.IconImage(Store.IconFile, s); } catch { }
+            if (emptyIcon != null) using (var faded = Faded(0.55f)) g.DrawImage(emptyIcon, new Rectangle((Width - s) / 2, top, s, s), 0, 0, emptyIcon.Width, emptyIcon.Height, GraphicsUnit.Pixel, faded);
+            int y = top + s + Theme.S(18);
+            if (!String.IsNullOrEmpty(EmptyTitle))
+                using (var t = Theme.Body(13, true)) { Theme.DrawText(g, EmptyTitle, t, Theme.Text, new Rectangle(0, y, Width, Theme.S(28)), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter); y += Theme.S(32); }
+            using (var f = Theme.Body(10.5f)) Theme.DrawText(g, EmptyText, f, Theme.Muted, new Rectangle(Theme.S(150), y, Width - Theme.S(300), Theme.S(70)), TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.WordBreak);
             return;
         }
         // One light for every lit edge in this frame (the pointer is the same for all of them).

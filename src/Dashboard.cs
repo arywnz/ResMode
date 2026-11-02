@@ -162,6 +162,7 @@ public class Dashboard : Form {
         refresh = new System.Windows.Forms.Timer { Interval = 1000 };
         refresh.Tick += delegate { UpdateView(); };
         Shown += delegate {
+            if (!owner.Configuration.TourDone) owner.RequestTour();
             UpdateView();
             refresh.Start();
             Motion.Run(Tuple.Create(this, "fade"), Motion.Normal, e => Opacity = e);
@@ -327,7 +328,9 @@ public class Dashboard : Form {
         sortButton.Text = "Ordem: " + (sort == "played" ? "Mais jogados" : sort == "recent" ? "Recentes" : "Nome");
         sortButton.Width = sortButton.PreferredWidth();
         tabsRow.PerformLayout();
-        grid.EmptyText = q != "" ? "Nenhum jogo com \"" + q + "\"." : "Nenhum jogo encontrado.";
+        if (q != "") { grid.EmptyTitle = "Nenhum resultado"; grid.EmptyText = "Nenhum jogo com \"" + q + "\". Confira o nome ou limpe a busca."; }
+        else if (all.Count == 0) { grid.EmptyTitle = "Sua biblioteca está vazia"; grid.EmptyText = "Instale um jogo na Steam, Epic ou GOG e ele aparece aqui sozinho. Também dá para clicar em Adicionar jogo e escolher a pasta ou o .exe."; }
+        else { grid.EmptyTitle = "Nada nesta aba"; grid.EmptyText = "Escolha outra aba para ver os jogos."; }
         grid.SetGames(shown, animate);
         Artwork.Load(all, GameGrid.Cover, () => { if (IsHandleCreated && !IsDisposed) BeginInvoke(new Action(grid.Invalidate)); });
     }
@@ -408,19 +411,19 @@ public class Dashboard : Form {
         var cfg = owner.Configuration;
         var current = GamePreferences.ModeOf(cfg, g.Key);
         var choices = new List<ResolutionPanel.Choice> {
-            new ResolutionPanel.Choice { Text = cfg.Width > 0 ? "PadrÃ£o (" + cfg.Width + " Ã— " + cfg.Height + ")" : "PadrÃ£o", Width = -1 },
-            new ResolutionPanel.Choice { Text = "Normal (nÃ£o trocar)", Width = 0 }
+            new ResolutionPanel.Choice { Text = cfg.Width > 0 ? "Padrão (" + cfg.Width + " × " + cfg.Height + ")" : "Padrão", Width = -1 },
+            new ResolutionPanel.Choice { Text = "Normal (não trocar)", Width = 0 }
         };
         try {
             foreach (var m in Native.LargerModes(owner.DisplayDevice, cfg.DesktopWidth, cfg.DesktopHeight))
-                choices.Add(new ResolutionPanel.Choice { Text = m.width + " Ã— " + m.height, Width = m.width, Height = m.height });
+                choices.Add(new ResolutionPanel.Choice { Text = m.width + " × " + m.height, Width = m.width, Height = m.height });
         } catch { }
         int selected = 0;
         if (current != null) selected = Math.Max(0, choices.FindIndex(c => c.Width == current.Width && c.Height == current.Height));
-        var side = new ResolutionPanel("ResoluÃ§Ã£o neste jogo", choices, selected);
+        var side = new ResolutionPanel("Resolução neste jogo", choices, selected);
         side.Picked += choice => {
             Act(() => owner.SetGameMode(g.Key, choice.Width, choice.Height));
-            panel.Mode.Text = "ResoluÃ§Ã£o: " + owner.GameModeText(g.Key);
+            panel.Mode.Text = "Resolução: " + owner.GameModeText(g.Key);
         };
         return side;
     }
@@ -449,6 +452,7 @@ public class Dashboard : Form {
         if (owner.CatalogBusy && !refreshButton.Spinning) refreshButton.Start(() => owner.CatalogPending);
         if (bell.Unread != owner.Unread) { bell.Unread = owner.Unread; bell.Invalidate(); }
         modePill.SetState(owner.DisplayActive, owner.DisplayActive ? owner.CurrentMode : "");
+        if (modal == null && owner.TakeTourRequest()) ShowModal(new TourOverlay(owner, WindowSnapshot));
         hintBar.Visible = owner.Configuration.Width == 0 && owner.Configuration.Games.Count > 0;
     }
 

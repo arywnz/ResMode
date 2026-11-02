@@ -67,6 +67,9 @@ public class SettingsOverlay : Modal {
         logLevel = new SelectBox { Width = Theme.S(170) };
         logLevel.Items = new List<object> { new LevelChoice("all", "Salvar tudo"), new LevelChoice("games", "Só os jogos"), new LevelChoice("off", "Não salvar") };
         logLevel.SelectionCommitted += delegate { Act(() => owner.SetLogLevel(((LevelChoice)logLevel.SelectedItem).Value)); };
+        var tourButton = new FlatButton { Text = "Rever guia" };
+        tourButton.Width = tourButton.PreferredWidth();
+        tourButton.Click += delegate { owner.RequestTour(); Close(); }; // the window opens it once this card is gone
         var exportLog = new FlatButton { Text = "Gerar log", Glyph = Theme.IconFolder };
         exportLog.Width = exportLog.PreferredWidth();
         exportLog.Click += delegate { Act(() => owner.ExportLog()); };
@@ -91,6 +94,7 @@ public class SettingsOverlay : Modal {
             Group("Sistema",
                 Row("Iniciar com o Windows", "Abre minimizado na bandeja.", null, startup),
                 Row("Corrigir ícones borrados", "Reinicia a barra de tarefas depois de jogar.", null, Pair(fixNow, taskbar)),
+                Row("Guia de boas-vindas", "Os quatro passos do primeiro uso.", null, tourButton),
                 Row("Registro de atividade", "Erros ficam sempre salvos.", null, Pair(logLevel, exportLog)),
                 Row("Procurar atualizações", null, updateInfo, Pair(updateButton, autoUpdate)))
         };

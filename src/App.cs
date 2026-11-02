@@ -70,6 +70,8 @@ public class AppContext : ApplicationContext {
         RunningNames = new List<string>();
         LibraryVersion = 1;
         config = Store.LoadSettings();
+        // Someone who already has a library has used the app: no walkthrough after an update.
+        if (!config.TourDone && config.Games.Count > 0) config.TourDone = true;
         paused = config.StartPaused;
         Store.LogLevel = config.LogLevel ?? "all";
         if (!File.Exists(Store.State)) FillDisplayDefaults(false);
@@ -563,6 +565,16 @@ public class AppContext : ApplicationContext {
         Apply(w, h);
         emptySince = DateTime.Now.AddSeconds(3); // ~6 s in total instead of the usual 3
         Store.Log("Teste de resolução: " + w + " × " + h + ". Volta sozinha em instantes.", LogKind.Game);
+    }
+
+    // Walkthrough: shown once to a new install, and again on request ("Rever guia" in Settings).
+    bool tourRequested;
+    public void RequestTour() { tourRequested = true; }
+    public bool TakeTourRequest() { bool asked = tourRequested; tourRequested = false; return asked; }
+    public void MarkTourDone() {
+        if (config.TourDone) return;
+        config.TourDone = true;
+        Store.SaveSettings(config);
     }
 
     public void SetSortMode(string mode) {

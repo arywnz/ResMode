@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.17";
+    public const string Release = "0.2.2-alpha.18";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -34,6 +34,8 @@ public class Settings {
     public bool FirstSearchDone = false;
     // While a game runs, the monitor beside the game's is centred on it instead of hanging from its top edge.
     public bool CenterSecondMonitor = true;
+    // The first-run walkthrough has been shown (or skipped).
+    public bool TourDone = false;
     // History: "all", "games" (game sessions only) or "off"; errors are always kept.
     public string LogLevel = "all";
     // Looks for a newer GitHub release at startup and every 15 minutes; AnnouncedUpdate keeps the tray balloon to once per version.
