@@ -28,8 +28,8 @@
             <File Source="$(var.SourceDir)\assets\ResMode-logo.png" />
             <File Source="$(var.SourceDir)\LICENSE" />
             <File Source="$(var.SourceDir)\README.md" />
-            <File Source="$(var.SourceDir)\PRIVACY.md" />
-            <File Source="$(var.SourceDir)\THIRD_PARTY_NOTICES.md" />
+            <File Source="$(var.SourceDir)\docs\PRIVACY.md" />
+            <File Source="$(var.SourceDir)\docs\THIRD_PARTY_NOTICES.md" />
             <File Source="$(var.SourceDir)\assets\fonts\OFL.txt" Name="Geist-OFL.txt" />
             <File Source="$(var.SourceDir)\installer\WIX-LICENSE.txt" />
             <RegistryValue Root="HKCU" Key="Software\ResMode\Installer" Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />

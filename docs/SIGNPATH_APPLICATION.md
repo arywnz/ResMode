@@ -20,13 +20,13 @@ Historical application material for the 0.1.0 release. The maintainer reported t
 
 **Build / provenance:** GitHub Actions on GitHub-hosted Windows runners, using the system .NET Framework compiler and source-controlled build, test and package scripts. Workflows pin actions to commit IDs. Unsigned input is uploaded as a workflow artifact before SignPath submission. We do not submit developer-built executables or private test certificates. Compilation embeds the original Geist fonts and OFL license. Release packages retain the prebuilt executable rather than recompiling during installation.
 
-**Artifacts:** A ZIP workflow artifact containing ResMode.exe; product name ResMode, product/file version 0.1.0.0. See signpath/artifact-configuration.xml. Only this project's executable is requested for signing.
+**Artifacts:** A ZIP workflow artifact containing ResMode.exe; product name ResMode, product/file version 0.1.0.0. See installer/signpath/artifact-configuration.xml. Only this project's executable is requested for signing.
 
 **Roles / approvals:** arywnz maintains the source, reviews external contributions and approves releases/signing requests. Production signing must require manual SignPath approval. MFA for GitHub and SignPath is a prerequisite to be confirmed by the maintainer before submission. We do not claim an independent second reviewer exists.
 
-**Privacy:** https://github.com/arywnz/ResMode/blob/main/PRIVACY.md. The runtime has no project telemetry backend. It may automatically query Steam app details with public app IDs during library discovery; this behavior and Valve's privacy policy are disclosed. Game paths, Steam account details, playtime, achievement data and diagnostic logs are not uploaded to the project or SignPath.
+**Privacy:** https://github.com/arywnz/ResMode/blob/main/docs/PRIVACY.md. The runtime has no project telemetry backend. It may automatically query Steam app details with public app IDs during library discovery; this behavior and Valve's privacy policy are disclosed. Game paths, Steam account details, playtime, achievement data and diagnostic logs are not uploaded to the project or SignPath.
 
-**Code signing policy:** https://github.com/arywnz/ResMode/blob/main/CODE_SIGNING.md
+**Code signing policy:** https://github.com/arywnz/ResMode/blob/main/docs/CODE_SIGNING.md
 
 ## Prerequisites before submission
 
@@ -41,7 +41,7 @@ Historical application material for the 0.1.0 release. The maintainer reported t
 ## After SignPath acceptance
 
 1. Install/authorize the official SignPath GitHub App only for this repository. That permission grant must be reviewed by the maintainer.
-2. Create the SignPath project, trusted GitHub build integration and artifact configuration from signpath/artifact-configuration.xml. Use the actual slugs assigned by SignPath.
+2. Create the SignPath project, trusted GitHub build integration and artifact configuration from installer/signpath/artifact-configuration.xml. Use the actual slugs assigned by SignPath.
 3. Require manual production approval in SignPath. Set up the GitHub `signing` environment with required maintainer review and main-only deployment protection before enabling the workflow.
 4. Protect main against force pushes and deletion; require review of outside contributions and successful CI. Review workflow changes as release-critical code. On a single-maintainer project, do not claim independent self-review or a second reviewer.
 5. Add `SIGNPATH_API_TOKEN` as an environment secret, never in source. Add environment variables `SIGNPATH_ORGANIZATION_ID`, `SIGNPATH_PROJECT_SLUG`, `SIGNPATH_SIGNING_POLICY_SLUG`. Set repository variable `SIGNPATH_ENABLED=true` only after these requirements are met.

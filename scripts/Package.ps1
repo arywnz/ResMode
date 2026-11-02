@@ -1,15 +1,18 @@
 param(
-    [string]$BinaryDirectory = (Join-Path $PSScriptRoot 'dist'),
-    [string]$OutputDirectory = (Join-Path $PSScriptRoot 'releases\package'),
-    [string]$ArchivePath = (Join-Path $PSScriptRoot 'releases\ResMode-0.2.2-alpha.21-win-x64-unsigned.zip')
+    [string]$BinaryDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist'),
+    [string]$OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'releases\package'),
+    [string]$ArchivePath = (Join-Path (Split-Path -Parent $PSScriptRoot) 'releases\ResMode-0.2.2-alpha.21-win-x64-unsigned.zip')
 )
 $ErrorActionPreference = 'Stop'
-$root = $PSScriptRoot
+$root = Split-Path -Parent $PSScriptRoot
 if ((Test-Path -LiteralPath $OutputDirectory) -and @(Get-ChildItem -LiteralPath $OutputDirectory -Force).Count -gt 0) { throw 'Package directory must be empty; previous output preserved.' }
 if (Test-Path -LiteralPath $ArchivePath) { throw 'Archive already exists; previous release preserved.' }
 New-Item -ItemType Directory -Force -Path $OutputDirectory,(Join-Path $OutputDirectory 'dist'),(Join-Path $OutputDirectory 'assets\fonts'),(Split-Path -Parent $ArchivePath) | Out-Null
 foreach ($file in 'ResMode.exe','ResMode.ico') { Copy-Item -LiteralPath (Join-Path $BinaryDirectory $file) -Destination (Join-Path $OutputDirectory 'dist') }
-foreach ($file in 'Instalar.cmd','Instalar.ps1','Desinstalar.cmd','Desinstalar.ps1','README.md','LICENSE','THIRD_PARTY_NOTICES.md','PRIVACY.md','CODE_SIGNING.md','SECURITY.md') { Copy-Item -LiteralPath (Join-Path $root $file) -Destination $OutputDirectory }
+# The ZIP keeps its flat layout: the portable scripts and the documents sit next to dist\ and assets\.
+foreach ($file in 'Instalar.cmd','Instalar.ps1','Desinstalar.cmd','Desinstalar.ps1') { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $OutputDirectory }
+foreach ($file in 'README.md','LICENSE') { Copy-Item -LiteralPath (Join-Path $root $file) -Destination $OutputDirectory }
+foreach ($file in 'THIRD_PARTY_NOTICES.md','PRIVACY.md','CODE_SIGNING.md','SECURITY.md') { Copy-Item -LiteralPath (Join-Path $root "docs\$file") -Destination $OutputDirectory }
 Copy-Item -LiteralPath (Join-Path $root 'assets\ResMode-logo.png') -Destination (Join-Path $OutputDirectory 'assets')
 Copy-Item -LiteralPath (Join-Path $root 'assets\fonts\OFL.txt') -Destination (Join-Path $OutputDirectory 'assets\fonts')
 $base = [IO.Path]::GetFullPath($OutputDirectory).TrimEnd('\') + '\'

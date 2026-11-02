@@ -1,7 +1,7 @@
-param([string]$OutputDirectory = (Join-Path $PSScriptRoot 'dist'))
+param([string]$OutputDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist'))
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Drawing
-$root = $PSScriptRoot
+$root = Split-Path -Parent $PSScriptRoot
 $source = Join-Path $root 'assets\ResMode-logo.png'
 $dist = $OutputDirectory
 New-Item -ItemType Directory -Path $dist -Force | Out-Null

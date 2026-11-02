@@ -1,5 +1,7 @@
 # ResMode
 
+> **Aviso antes de tudo:** o ResMode foi feito para ser usado com upscaling **FSR 4 ou DLSS**. Resolução maior + upscaler decente é a receita. De FSR 3 para baixo a imagem fica uma merda, toda farinhenta, e nem o ResMode te salva disso. Se o seu jogo só tem FSR 2 ou 3, aceite o destino ou troque de jogo.
+
 **Você gastou uma fortuna na placa de vídeo pra ficar refém de um monitor 1080p de betinha.**
 
 O ResMode nasceu de um problema extremamente específico: querer jogar em uma resolução maior sem precisar transformar o desktop inteiro num experimento científico toda vez que abre um jogo.
@@ -87,7 +89,7 @@ As configurações, a biblioteca e os registros ficam no seu computador, com pro
 
 O aplicativo pode consultar a Steam para identificar jogos e o GitHub para verificar atualizações. Os logs só são exportados quando você solicita.
 
-Mais detalhes em [PRIVACY.md](PRIVACY.md).
+Mais detalhes em [PRIVACY.md](docs/PRIVACY.md).
 
 ## Ainda estamos na fase das experiências
 
@@ -97,9 +99,9 @@ Isso significa que tem funcionalidades prontas, testes automatizados e também a
 
 Encontrou um bug? [Abra uma issue](https://github.com/arywnz/ResMode/issues). Explique o que aconteceu e, se possível, envie o log gerado pelo aplicativo, depois de conferir se não tem informações pessoais.
 
-Se quiser compilar, veja [CONTRIBUTING.md](CONTRIBUTING.md).
+Se quiser compilar, veja [CONTRIBUTING.md](docs/CONTRIBUTING.md).
 
-Licença [MIT](LICENSE). As fontes Geist possuem licença própria, descrita em [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Licença [MIT](LICENSE). As fontes Geist possuem licença própria, descrita em [THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md).
 
 ---
 

@@ -22,13 +22,13 @@ jobs:
         with:
           persist-credentials: false
       - name: Build from source
-        run: ./Build.ps1
+        run: ./scripts/Build.ps1
       - name: Regression checks
-        run: ./Test.ps1
+        run: ./scripts/Test.ps1
       - name: Package unsigned prerelease
-        run: ./Package.ps1
+        run: ./scripts/Package.ps1
       - name: Build per-user MSI
-        run: ./Build-Msi.ps1
+        run: ./scripts/Build-Msi.ps1
       - name: MSI install and uninstall smoke test
         run: ./tests/InstallerChecks.ps1 -Msi ./releases/ResMode-0.2.2-alpha.21-win-x64.msi
       - name: Upload unsigned package
@@ -68,6 +68,6 @@ jobs:
         run: gh run download "${{ github.run_id }}" -n ResMode-unsigned-win-x64 -D package
       - name: Publish the prerelease
         run: |
-          notes="docs/RELEASE_NOTES_${TAG#v}.md"
+          notes="docs/release-notes/RELEASE_NOTES_${TAG#v}.md"
           [ -f "$notes" ] || { echo "Missing $notes"; exit 1; }
           gh release create "$TAG" --prerelease --verify-tag --title "ResMode ${TAG#v}" --notes-file "$notes" package/*.msi package/*.zip

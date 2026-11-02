@@ -12,4 +12,4 @@ Download `ResMode-0.1.0-alpha.1-win-x64-unsigned.zip`, extract the complete pack
 
 Automated build/test results are recorded in the linked CI run. They cover deterministic geometry, preferences/exclusions, process/path helpers, font loading, cover colors and hover lifecycle. They do not prove sustained game performance, every monitor topology or every application's window restoration. Interactive validation of the newly prepared UI changes is pending on the development PC because application control blocks the new build there.
 
-See [Privacy](https://github.com/arywnz/ResMode/blob/main/PRIVACY.md), [Code signing policy](https://github.com/arywnz/ResMode/blob/main/CODE_SIGNING.md) and [License](https://github.com/arywnz/ResMode/blob/main/LICENSE).
+See [Privacy](https://github.com/arywnz/ResMode/blob/main/docs/PRIVACY.md), [Code signing policy](https://github.com/arywnz/ResMode/blob/main/docs/CODE_SIGNING.md) and [License](https://github.com/arywnz/ResMode/blob/main/LICENSE).

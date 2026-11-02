@@ -1,4 +1,5 @@
-param([string]$BinaryDirectory = (Join-Path $PSScriptRoot 'dist'), [switch]$CompileOnly)
+param([string]$BinaryDirectory = (Join-Path (Split-Path -Parent $PSScriptRoot) 'dist'), [switch]$CompileOnly)
+$repo = Split-Path -Parent $PSScriptRoot
 $ErrorActionPreference = 'Stop'
 $binary = Join-Path $BinaryDirectory 'ResMode.exe'
 if (-not (Test-Path -LiteralPath $binary)) { throw 'Build ResMode first with Build.ps1.' }
@@ -8,11 +9,11 @@ $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $fixture = Join-Path $BinaryDirectory 'FeatureChecks.exe'
 & $compiler /nologo /target:exe /platform:x64 /optimize+ /codepage:65001 "/out:$fixture" "/reference:$binary" `
     /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Core.dll `
-    (Join-Path $PSScriptRoot 'tests\FeatureChecks.cs')
+    (Join-Path $repo 'tests\FeatureChecks.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Regression fixture compilation failed.' }
 & $compiler /nologo /target:exe /platform:x64 /optimize+ /codepage:65001 "/out:$(Join-Path $BinaryDirectory 'SecurityChecks.exe')" "/reference:$binary" `
     /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Security.dll `
-    (Join-Path $PSScriptRoot 'tests\SecurityChecks.cs')
+    (Join-Path $repo 'tests\SecurityChecks.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Security fixture compilation failed.' }
 if ($CompileOnly) { Write-Output 'Fixture compiled; execution deliberately skipped.'; return }
 foreach ($test in '/selftest','/preferencestest','features','security') {

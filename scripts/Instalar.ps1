@@ -2,7 +2,8 @@
 param([switch]$NoStart, [string]$PreviousInstallRoot)
 $ErrorActionPreference = 'Stop'
 $name = 'ResMode'
-$root = $PSScriptRoot
+# In a release package the script sits next to assets\ and dist\; in the repository it lives in scripts\.
+$root = if (Test-Path -LiteralPath (Join-Path $PSScriptRoot 'assets')) { $PSScriptRoot } else { Split-Path -Parent $PSScriptRoot }
 $dist = Join-Path $root 'dist'
 $installRoot = Join-Path $env:LOCALAPPDATA $name
 if (-not $PreviousInstallRoot) {
@@ -21,7 +22,7 @@ $exe = Join-Path $dist "$name.exe"
 # Release packages already contain the built executable; keep its signature intact.
 # A source checkout has no dist binary and uses the same build script as CI.
 if (-not (Test-Path -LiteralPath $exe)) {
-    & (Join-Path $root 'Build.ps1') -OutputDirectory $dist
+    & (Join-Path $PSScriptRoot 'Build.ps1') -OutputDirectory $dist
 }
 if (-not (Test-Path -LiteralPath $icon)) { throw 'Pacote incompleto: ResMode.ico ausente.' }
 
