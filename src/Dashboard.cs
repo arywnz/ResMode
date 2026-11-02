@@ -15,6 +15,7 @@ public class Dashboard : Form {
     [DllImport("dwmapi.dll")] static extern int DwmSetIconicLivePreviewBitmap(IntPtr h, IntPtr bitmap, IntPtr clientOffset, int flags);
     [DllImport("dwmapi.dll")] static extern int DwmInvalidateIconicBitmaps(IntPtr h);
     [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr handle);
+    [DllImport("user32.dll")] static extern bool RedrawWindow(IntPtr window, IntPtr rect, IntPtr region, uint flags);
 
     // What the taskbar shows when the pointer rests on the button. Without this a minimized custom-painted window gets a
     // grey placeholder, so the window is photographed when it is minimized and that picture is handed to Windows on request.
@@ -38,7 +39,6 @@ public class Dashboard : Form {
     // maxWidth/maxHeight are the thumbnail's limits; 0 means the full picture (live preview).
     void SendPicture(bool live, int maxWidth, int maxHeight) {
         try {
-            if (WindowState != FormWindowState.Minimized && Visible) Remember();
             if (lastShot == null) return;
             Bitmap bmp = lastShot;
             bool scaled = false;
@@ -62,10 +62,23 @@ public class Dashboard : Form {
     }
 
     protected override void WndProc(ref Message m) {
-        if (m.Msg == 0x112 && ((int)m.WParam.ToInt64() & 0xFFF0) == 0xF020) { Remember(); DwmInvalidateIconicBitmaps(Handle); } // SC_MINIMIZE: keep how it looked
+        // Minimizing: photograph the window once, then tell Windows to ask for that picture as the taskbar preview. Only while
+        // minimized: with the flag on all the time Windows asked for a picture (and the window was photographed) every time
+        // the pointer crossed the taskbar button, and the window sometimes came back from minimized with unpainted controls.
+        if (m.Msg == 0x112 && ((int)m.WParam.ToInt64() & 0xFFF0) == 0xF020) { Remember(); IconicPreview(true); DwmInvalidateIconicBitmaps(Handle); }
         else if (m.Msg == 0x323) { long p = m.LParam.ToInt64(); SendPicture(false, (int)((p >> 16) & 0xFFFF), (int)(p & 0xFFFF)); return; } // WM_DWMSENDICONICTHUMBNAIL
         else if (m.Msg == 0x326) { SendPicture(true, 0, 0); return; } // WM_DWMSENDICONICLIVEPREVIEWBITMAP
         base.WndProc(ref m);
+        // WM_SIZE, restored or maximized (not minimized): back to the normal preview, and repaint every control, since a
+        // window that was minimized can come back with child controls nobody asked to paint.
+        if (m.Msg == 0x5 && m.WParam.ToInt64() != 1) {
+            IconicPreview(false);
+            if (IsHandleCreated) BeginInvoke(new Action(() => { if (!IsDisposed && WindowState != FormWindowState.Minimized) RedrawWindow(Handle, IntPtr.Zero, IntPtr.Zero, 0x185); }));
+        }
+    }
+
+    void IconicPreview(bool on) {
+        try { int value = on ? 1 : 0; DwmSetWindowAttribute(Handle, 10, ref value, 4); } catch { } // DWMWA_HAS_ICONIC_BITMAP
     }
 
 
@@ -217,8 +230,6 @@ public class Dashboard : Form {
             DwmSetWindowAttribute(Handle, 33, ref round, 4);    // rounded window corners
             DwmSetWindowAttribute(Handle, 35, ref caption, 4);  // title bar color matches the window
             DwmSetWindowAttribute(Handle, 36, ref text, 4);
-            int yes = 1;
-            DwmSetWindowAttribute(Handle, 10, ref yes, 4);      // DWMWA_HAS_ICONIC_BITMAP: Windows asks this window for its taskbar preview
         } catch { }
     }
 
