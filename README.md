@@ -6,7 +6,7 @@ O ResMode nasceu de um problema extremamente específico: querer jogar em uma re
 
 Ativou o DLDSR, foi jogar em 1440p ou 4K, terminou a jogatina e teve que voltar nas configurações do Windows para desfazer a brincadeira?
 
-Pois é. Eu também achei uma merda.
+Pois é,Eu também achei uma porra fazer isso toda hora.
 
 ## Mas que desgraça esse programa faz?
 
