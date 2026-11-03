@@ -93,7 +93,7 @@ public class SettingsOverlay : Modal {
                 Row("Ignorar competitivos", "Ficam na resolução nativa, onde FPS e latência pesam mais que nitidez.", null, competitive)),
             Group("Sistema",
                 Row("Iniciar com o Windows", "Abre minimizado na bandeja.", null, startup),
-                Row("Corrigir ícones borrados", "Reinicia a barra de tarefas depois de jogar.", null, Pair(fixNow, taskbar)),
+                Row("Corrigir ícones borrados", "Refaz os ícones da barra de tarefas depois de jogar, sem reiniciar o Explorer.", null, Pair(fixNow, taskbar)),
                 Row("Guia de boas-vindas", "Os quatro passos do primeiro uso.", null, tourButton),
                 Row("Registro de atividade", "Erros ficam sempre salvos.", null, Pair(logLevel, exportLog)),
                 Row("Procurar atualizações", null, updateInfo, Pair(updateButton, autoUpdate)))

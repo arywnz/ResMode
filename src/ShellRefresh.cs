@@ -115,6 +115,13 @@ public static class ShellRefresh {
             {busy=true;blockers.Add(cls+"("+rect.Width+"x"+rect.Height+")");}return true;
         },IntPtr.Zero);if(busy)Defer(blockers.Count==1?"feche a janela do Explorer que está aberta.":"feche as "+blockers.Count+" janelas do Explorer que estão abertas.");return busy;
     }
+    [DllImport("shell32.dll")] static extern void SHChangeNotify(int eventId,uint flags,IntPtr item1,IntPtr item2);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode,EntryPoint="SendMessageTimeoutW")] static extern IntPtr BroadcastSetting(IntPtr window,uint message,IntPtr wParam,string setting,uint flags,uint timeout,out IntPtr result);
+    // Icon cache and window metrics notifications: the shell redraws the taskbar without being restarted.
+    public static void GentleRefresh(){
+        SHChangeNotify(0x08000000,0,IntPtr.Zero,IntPtr.Zero); // SHCNE_ASSOCCHANGED
+        foreach(string setting in new[]{"TraySettings","ImmersiveColorSet","WindowMetrics"}){IntPtr result;BroadcastSetting((IntPtr)0xFFFF,0x1A,IntPtr.Zero,setting,2,2000,out result);} // WM_SETTINGCHANGE to everyone
+    }
     public static bool TryRun(string gameDisplay){
         if(!IsPending)return true;
         if(File.Exists(Store.State)||DesktopLayout.GamePids(Store.LoadSettings().Games).Count>0){Defer("um jogo está aberto.");return false;}
@@ -122,25 +129,13 @@ public static class ShellRefresh {
         try{
             if(!WaitReady(2000)){Defer("a área de trabalho ainda está estabilizando.");return false;}
             if(File.Exists(RecoveryFile)){if(!RestoreFolders(Store.Read<List<Folder>>(RecoveryFile)))return false;File.Delete(RecoveryFile);Cancel();return true;}
-            var folders=Folders();if(HasExplorerWindows(id,folders))return false;
-            using(var shell=Process.GetProcessById((int)id)){
-                string expected=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows),"explorer.exe");
-                if(!String.Equals(Native.Exe(shell),expected,StringComparison.OrdinalIgnoreCase)){Defer("a barra de tarefas não é a do Windows.");return false;}
-                // Check again immediately before acting, and preserve other monitors across the shell restart.
-                var windows=DesktopLayout.Capture(gameDisplay,true,DesktopLayout.GamePids(Store.LoadSettings().Games));folders=Folders();if(HasExplorerWindows(id,folders))return false;
-                string recovery=RecoveryFile;
-                string eventName="Local\\ResMode.ShellGuard."+Guid.NewGuid().ToString("N");
-                using(var armed=new EventWaitHandle(false,EventResetMode.ManualReset,eventName))
-                using(var guard=Process.Start(new ProcessStartInfo(System.Windows.Forms.Application.ExecutablePath,"/shellguard "+id+" "+eventName){UseShellExecute=false,CreateNoWindow=true})){
-                    if(!armed.WaitOne(4000)){Store.Log("A recuperação independente não iniciou; o Explorer foi preservado.",LogKind.Error);return false;}
-                    if(File.Exists(Store.State)||DesktopLayout.GamePids(Store.LoadSettings().Games).Count>0){Defer("um jogo acabou de abrir.");return false;}
-                    Store.Write(recovery,folders);
-                    if(guard.HasExited){File.Delete(recovery);Store.Log("A proteção de recuperação encerrou antes da ação; o Explorer foi preservado.",LogKind.Error);return false;}
-                    shell.Kill();shell.WaitForExit(2000);
-                    if(!WaitReady(25000)||ShellPid()==id){Store.Log("A área de trabalho e a barra ainda não confirmaram a volta; recuperação pendente.",LogKind.Error);return false;}
-                }
-                bool restored=RestoreFolders(folders);DesktopLayout.Settle(windows);Cancel();lastDeferral="";if(restored&&File.Exists(recovery))File.Delete(recovery);Store.Log("Barra de tarefas recriada"+(folders.Count>0?(restored?"; pastas abertas de novo.":"; algumas pastas não reabriram."):"."));return true;
-            }
+            // Not a kill and restart of Explorer: Windows logs that as a shell crash, empties the notification area and took
+            // Game Bar down with it. Telling the shell that icon and window metrics changed makes it redraw the taskbar and
+            // its icons crisp, in place (checked on a real resolution round trip: the icons came back sharp).
+            GentleRefresh();
+            Cancel();lastDeferral="";
+            Store.Log("Ícones da barra de tarefas atualizados.");
+            return true;
         }catch(Exception e){Store.Log("Correção da barra adiada: "+e.Message, LogKind.Error);return false;}
     }
     public static bool RestoreFolders(List<Folder> folders){

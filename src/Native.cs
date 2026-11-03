@@ -13,7 +13,7 @@ public static class AppInfo {
     public const string MutexName = "Local\\ResMode.ResolutionWatcher";
     public const string ShowEventName = "Local\\ResMode.Show";
     // Shown to the user and compared with GitHub releases; keep in step with AssemblyInfo.cs and the MSI.
-    public const string Release = "0.2.2-alpha.23";
+    public const string Release = "0.2.2-alpha.24";
 }
 
 public class GameRule { public string Name; public string Exe; public string Source; }
@@ -25,7 +25,8 @@ public class Settings {
     // Last desktop mode seen before switching to the game resolution; 0 = read from the monitor on first run.
     public int DesktopWidth, DesktopHeight;
     public string Display = "";
-    public bool AutoRefreshTaskbar = false;
+    // After a game, the taskbar icons are redrawn crisp (no Explorer restart any more, so it is safe to leave on).
+    public bool AutoRefreshTaskbar = true;
     public bool StartPaused = false;
     // Competitive games stay at the desktop resolution unless the user turned them on (IncludedGames).
     public bool SkipCompetitive = true;
