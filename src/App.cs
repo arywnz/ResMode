@@ -552,14 +552,19 @@ public class AppContext : ApplicationContext {
     bool TargetFor(List<string> games, out int w, out int h) {
         w = config.Width;
         h = config.Height;
+        modeSource = "padrão para todos os jogos";
         var rule = config.Games.FirstOrDefault(g => games.Contains(g.Name));
         var mode = rule == null ? null : GamePreferences.ModeOf(config, GamePreferences.Key(rule));
         if (mode == null) return true;
         if (mode.Width == 0) return false;
         w = mode.Width;
         h = mode.Height;
+        modeSource = "escolhida só para este jogo";
         return true;
     }
+
+    // Where the resolution of this session came from, so the history says whether a game's own choice or the general one was used.
+    string modeSource = "padrão para todos os jogos";
 
     // width -1 = back to the general resolution, 0 = leave this game at the normal resolution, otherwise that resolution.
     public void SetGameMode(string key, int width, int height) {
@@ -579,6 +584,7 @@ public class AppContext : ApplicationContext {
     // The usual "no game running" logic then puts the desktop back on its own.
     public void TestResolution(int w, int h) {
         if (active || Running().Count > 0) throw new Exception("Feche o jogo antes de testar.");
+        modeSource = "teste de resolução";
         Apply(w, h);
         emptySince = DateTime.Now.AddSeconds(3); // ~6 s in total instead of the usual 3
         Store.Log("Teste de resolução: " + w + " × " + h + ". Volta sozinha em instantes.", LogKind.Game);
@@ -695,7 +701,7 @@ public class AppContext : ApplicationContext {
         }
         if (config.CenterSecondMonitor && before != null) CenterNeighbours(device, before, others);
         DesktopLayout.Settle(windows.Where(x => !String.Equals(x.Device, device, StringComparison.OrdinalIgnoreCase)).ToList());
-        Store.Log("Resolução de jogo ligada: " + after.width + " × " + after.height + " a " + after.hz + " Hz.", LogKind.Game);
+        Store.Log("Resolução de jogo ligada: " + after.width + " × " + after.height + " a " + after.hz + " Hz (" + modeSource + ").", LogKind.Game);
         diagnoseAt = DateTime.Now.AddSeconds(15);
         // No icon: Windows then shows only the app's own icon in the header, instead of a generic blue "i".
         string game = RunningNames.FirstOrDefault();

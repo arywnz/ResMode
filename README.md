@@ -57,7 +57,7 @@ Tudo isso sem precisar instalar um launcher para abrir outro launcher que finalm
 
 ## Como instalar
 
-**[Baixar o ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.24/ResMode-0.2.2-alpha.24-win-x64.msi)**
+**[Baixar o ResMode para Windows (.msi)](https://github.com/arywnz/ResMode/releases/download/v0.2.2-alpha.25/ResMode-0.2.2-alpha.25-win-x64.msi)**
 
 Funciona no Windows 10 e 11 de 64 bits.
 
